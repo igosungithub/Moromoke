@@ -14,6 +14,8 @@ import {
 } from '../utils/helpers';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { PermissionGate } from '../components/ui/PermissionGate';
+import { usePermissions } from '../hooks/usePermissions';
 import type { Allergy, ClinicalNote, Diagnosis, PatientStatus } from '../types';
 
 type TabType = 'overview' | 'vitals' | 'medications' | 'allergies' | 'labs' | 'imaging' | 'notes' | 'encounter';
@@ -25,6 +27,7 @@ export default function PatientDetail() {
     addClinicalNote, updateClinicalNote, addDiagnosis } = usePatientStore();
   const { currentUser } = useStaffStore();
   const { addNotification } = useUIStore();
+  const { can } = usePermissions();
 
   const [tab, setTab] = useState<TabType>('overview');
   const [allergyModal, setAllergyModal] = useState(false);
@@ -153,26 +156,32 @@ export default function PatientDetail() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => navigate(`/triage?patientId=${patient.id}`)} className="btn-warning">
-            <Activity size={16} />
-            Triage
-          </button>
-          <button onClick={() => navigate(`/patients/${patient.id}/edit`)} className="btn-secondary">
-            <Edit size={16} />
-            Edit
-          </button>
-          <select
-            value={patient.status}
-            onChange={(e) => updatePatient(patient.id, { status: e.target.value as PatientStatus })}
-            className="select-field w-auto text-sm border-gray-300"
-          >
-            <option value="waiting">Waiting</option>
-            <option value="in-triage">In Triage</option>
-            <option value="in-treatment">In Treatment</option>
-            <option value="admitted">Admitted</option>
-            <option value="discharged">Discharged</option>
-            <option value="transferred">Transferred</option>
-          </select>
+          <PermissionGate permission="triage:create">
+            <button onClick={() => navigate(`/triage?patientId=${patient.id}`)} className="btn-warning">
+              <Activity size={16} />
+              Triage
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="patient:edit">
+            <button onClick={() => navigate(`/patients/${patient.id}/edit`)} className="btn-secondary">
+              <Edit size={16} />
+              Edit
+            </button>
+          </PermissionGate>
+          <PermissionGate permission="patient:edit">
+            <select
+              value={patient.status}
+              onChange={(e) => updatePatient(patient.id, { status: e.target.value as PatientStatus })}
+              className="select-field w-auto text-sm border-gray-300"
+            >
+              <option value="waiting">Waiting</option>
+              <option value="in-triage">In Triage</option>
+              <option value="in-treatment">In Treatment</option>
+              <option value="admitted">Admitted</option>
+              <option value="discharged">Discharged</option>
+              <option value="transferred">Transferred</option>
+            </select>
+          </PermissionGate>
         </div>
       </div>
 
@@ -289,9 +298,11 @@ export default function PatientDetail() {
           <div>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-gray-900">Vital Signs History</h3>
-              <button onClick={() => navigate(`/vitals?patientId=${patient.id}`)} className="btn-primary text-sm">
-                <Plus size={16} /> Record Vitals
-              </button>
+              <PermissionGate permission="vitals:create">
+                <button onClick={() => navigate(`/vitals?patientId=${patient.id}`)} className="btn-primary text-sm">
+                  <Plus size={16} /> Record Vitals
+                </button>
+              </PermissionGate>
             </div>
             {patient.vitalsHistory.length === 0 ? (
               <p className="text-gray-400 text-center py-8">No vitals recorded yet.</p>
@@ -342,9 +353,11 @@ export default function PatientDetail() {
           <div>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-gray-900">Medications</h3>
-              <button onClick={() => navigate(`/medications?patientId=${patient.id}`)} className="btn-primary text-sm">
-                <Plus size={16} /> Add Medication
-              </button>
+              <PermissionGate permission="medications:prescribe">
+                <button onClick={() => navigate(`/medications?patientId=${patient.id}`)} className="btn-primary text-sm">
+                  <Plus size={16} /> Add Medication
+                </button>
+              </PermissionGate>
             </div>
             {patient.currentMedications.length === 0 ? (
               <p className="text-gray-400 text-center py-8">No medications recorded.</p>
@@ -382,9 +395,11 @@ export default function PatientDetail() {
           <div>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-gray-900">Allergies & Adverse Reactions</h3>
-              <button onClick={() => { setAllergyForm({ status: 'active', severity: 'moderate' }); setEditingAllergyId(null); setAllergyModal(true); }} className="btn-primary text-sm">
-                <Plus size={16} /> Add Allergy
-              </button>
+              <PermissionGate permission="patient:edit">
+                <button onClick={() => { setAllergyForm({ status: 'active', severity: 'moderate' }); setEditingAllergyId(null); setAllergyModal(true); }} className="btn-primary text-sm">
+                  <Plus size={16} /> Add Allergy
+                </button>
+              </PermissionGate>
             </div>
             {patient.allergies.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
@@ -414,22 +429,26 @@ export default function PatientDetail() {
                         {a.notes && <p className="text-xs text-gray-500 mt-1">{a.notes}</p>}
                       </div>
                       <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setAllergyForm(a);
-                            setEditingAllergyId(a.id);
-                            setAllergyModal(true);
-                          }}
-                          className="text-blue-600 hover:text-blue-700"
-                        >
-                          <Edit size={15} />
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirm({ type: 'allergy', id: a.id })}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                        <PermissionGate permission="patient:edit">
+                          <button
+                            onClick={() => {
+                              setAllergyForm(a);
+                              setEditingAllergyId(a.id);
+                              setAllergyModal(true);
+                            }}
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            <Edit size={15} />
+                          </button>
+                        </PermissionGate>
+                        <PermissionGate permission="patient:delete">
+                          <button
+                            onClick={() => setDeleteConfirm({ type: 'allergy', id: a.id })}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </PermissionGate>
                       </div>
                     </div>
                   </div>
@@ -443,9 +462,11 @@ export default function PatientDetail() {
           <div>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-gray-900">Lab Results</h3>
-              <button onClick={() => navigate(`/labs?patientId=${patient.id}`)} className="btn-primary text-sm">
-                <Plus size={16} /> Order Labs
-              </button>
+              <PermissionGate permission="labs:order">
+                <button onClick={() => navigate(`/labs?patientId=${patient.id}`)} className="btn-primary text-sm">
+                  <Plus size={16} /> Order Labs
+                </button>
+              </PermissionGate>
             </div>
             {patient.labResults.length === 0 ? (
               <p className="text-gray-400 text-center py-8">No lab orders.</p>
@@ -510,9 +531,11 @@ export default function PatientDetail() {
           <div>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-gray-900">Imaging Orders</h3>
-              <button onClick={() => navigate(`/imaging?patientId=${patient.id}`)} className="btn-primary text-sm">
-                <Plus size={16} /> Order Imaging
-              </button>
+              <PermissionGate permission="imaging:order">
+                <button onClick={() => navigate(`/imaging?patientId=${patient.id}`)} className="btn-primary text-sm">
+                  <Plus size={16} /> Order Imaging
+                </button>
+              </PermissionGate>
             </div>
             {patient.imagingOrders.length === 0 ? (
               <p className="text-gray-400 text-center py-8">No imaging orders.</p>
@@ -567,9 +590,11 @@ export default function PatientDetail() {
           <div>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-gray-900">Clinical Notes</h3>
-              <button onClick={() => { setNoteForm({ type: 'progress', isSigned: false }); setEditingNoteId(null); setNoteModal(true); }} className="btn-primary text-sm">
-                <Plus size={16} /> Add Note
-              </button>
+              <PermissionGate permission="notes:create">
+                <button onClick={() => { setNoteForm({ type: 'progress', isSigned: false }); setEditingNoteId(null); setNoteModal(true); }} className="btn-primary text-sm">
+                  <Plus size={16} /> Add Note
+                </button>
+              </PermissionGate>
             </div>
             {patient.clinicalNotes.length === 0 ? (
               <p className="text-gray-400 text-center py-8">No clinical notes.</p>
@@ -592,13 +617,20 @@ export default function PatientDetail() {
                       <div className="flex gap-2">
                         {!note.isSigned && (
                           <>
-                            <button onClick={() => signNote(note.id)} className="text-xs text-green-600 hover:text-green-700 font-medium">Sign</button>
-                            <button
-                              onClick={() => { setNoteForm(note); setEditingNoteId(note.id); setNoteModal(true); }}
-                              className="text-blue-600 hover:text-blue-700"
-                            >
-                              <Edit size={15} />
-                            </button>
+                            <PermissionGate permission="notes:sign">
+                              <button onClick={() => signNote(note.id)} className="text-xs text-green-600 hover:text-green-700 font-medium">Sign</button>
+                            </PermissionGate>
+                            <PermissionGate anyOf={[
+                              ...(note.authorId === currentUser?.id ? ['notes:edit_own' as const] : []),
+                              'notes:edit_any' as const,
+                            ]}>
+                              <button
+                                onClick={() => { setNoteForm(note); setEditingNoteId(note.id); setNoteModal(true); }}
+                                className="text-blue-600 hover:text-blue-700"
+                              >
+                                <Edit size={15} />
+                              </button>
+                            </PermissionGate>
                           </>
                         )}
                       </div>
@@ -631,9 +663,11 @@ export default function PatientDetail() {
           <div>
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-gray-900">Current Encounter</h3>
-              <button onClick={() => setDiagnosisModal(true)} className="btn-primary text-sm">
-                <Plus size={16} /> Add Diagnosis
-              </button>
+              <PermissionGate permission="diagnosis:create">
+                <button onClick={() => setDiagnosisModal(true)} className="btn-primary text-sm">
+                  <Plus size={16} /> Add Diagnosis
+                </button>
+              </PermissionGate>
             </div>
             {activeEncounter ? (
               <div className="space-y-4">
@@ -670,7 +704,7 @@ export default function PatientDetail() {
                   </div>
                 )}
 
-                {activeEncounter.status === 'active' && (
+                {activeEncounter.status === 'active' && can('discharge:manage') && (
                   <div className="border-t pt-4">
                     <h4 className="text-sm font-semibold text-gray-700 mb-3">Discharge Planning</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

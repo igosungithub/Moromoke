@@ -1,431 +1,487 @@
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useState } from 'react';
-import { Activity, Save, ArrowLeft, AlertCircle } from 'lucide-react';
+import {
+  AlertTriangle, CheckCircle, Activity, Pill, FlaskConical, ArrowRight,
+  ChevronDown, ChevronUp, Phone, MapPin, Save, ArrowLeft, Info, Stethoscope
+} from 'lucide-react';
 import { usePatientStore } from '../store/patientStore';
 import { useStaffStore } from '../store/staffStore';
 import { useUIStore } from '../store/uiStore';
-import { getPatientFullName, calculateAge, ESI_COLORS, ESI_LABELS } from '../utils/helpers';
-import type { TriagePriority } from '../types';
+import {
+  TRIAGE_PROTOCOLS, COMPLAINT_OPTIONS, type ChiefComplaint, type TriageProtocol
+} from '../utils/triageProtocols';
+import { getPatientFullName } from '../utils/helpers';
+import { PermissionGate } from '../components/ui/PermissionGate';
 
-const triageSchema = z.object({
-  patientId: z.string().min(1, 'Patient required'),
-  chiefComplaint: z.string().min(1, 'Chief complaint required'),
-  onset: z.string().min(1, 'Onset required'),
-  duration: z.string().min(1, 'Duration required'),
-  severity: z.number().min(1).max(10),
-  esiLevel: z.number().min(1).max(5),
-  temperature: z.number().optional(),
-  temperatureUnit: z.enum(['C', 'F']).optional(),
-  bloodPressureSystolic: z.number().optional(),
-  bloodPressureDiastolic: z.number().optional(),
-  heartRate: z.number().optional(),
-  respiratoryRate: z.number().optional(),
-  oxygenSaturation: z.number().optional(),
-  weight: z.number().optional(),
-  weightUnit: z.enum(['kg', 'lbs']).optional(),
-  height: z.number().optional(),
-  heightUnit: z.enum(['cm', 'in']).optional(),
-  painScore: z.number().min(0).max(10).optional(),
-  glucoseLevel: z.number().optional(),
-  symptoms: z.string().optional(),
-  mechanism: z.string().optional(),
-  notes: z.string().optional(),
-  allergiesConfirmed: z.boolean(),
-  medicationsConfirmed: z.boolean(),
-});
-
-type TriageFormData = z.infer<typeof triageSchema>;
-
-const ESI_DESCRIPTIONS = {
-  1: 'Requires immediate life-saving intervention',
-  2: 'High-risk situation, should not wait',
-  3: 'Requires 2+ resources, stable vitals',
-  4: 'Requires 1 resource',
-  5: 'Requires no resources (history only)',
+const ESI_CONFIG = {
+  1: { color: 'bg-red-600 text-white', border: 'border-red-400', label: 'Level 1 — Resuscitation', description: 'Immediate life-threatening — resuscitate NOW' },
+  2: { color: 'bg-orange-500 text-white', border: 'border-orange-400', label: 'Level 2 — Emergent', description: 'High risk — respond within 15 minutes' },
+  3: { color: 'bg-yellow-400 text-gray-900', border: 'border-yellow-400', label: 'Level 3 — Urgent', description: 'Stable but requires intervention' },
+  4: { color: 'bg-green-400 text-gray-900', border: 'border-green-400', label: 'Level 4 — Less Urgent', description: 'Minor condition — treat when possible' },
+  5: { color: 'bg-blue-300 text-gray-900', border: 'border-blue-300', label: 'Level 5 — Non-Urgent', description: 'Routine — can wait' },
 };
+
+type Step = 'select-patient' | 'select-complaint' | 'assessment' | 'guidance';
 
 export default function TriagePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const preSelectedPatientId = searchParams.get('patientId');
-
-  const { patients, updatePatient, addTriageAssessment, addVitals, addEncounter } = usePatientStore();
+  const { patients, addTriageAssessment } = usePatientStore();
   const { currentUser } = useStaffStore();
   const { addNotification } = useUIStore();
-  const [selectedESI, setSelectedESI] = useState<TriagePriority>(3);
 
-  const activePatients = patients.filter((p) => !['discharged', 'transferred'].includes(p.status));
+  const preselectedId = searchParams.get('patientId');
 
-  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<TriageFormData>({
-    resolver: zodResolver(triageSchema),
-    defaultValues: {
-      patientId: preSelectedPatientId || '',
-      severity: 5,
-      esiLevel: 3,
-      temperatureUnit: 'C',
-      weightUnit: 'kg',
-      heightUnit: 'cm',
-      allergiesConfirmed: false,
-      medicationsConfirmed: false,
-    },
+  const [step, setStep] = useState<Step>(preselectedId ? 'select-complaint' : 'select-patient');
+  const [selectedPatientId, setSelectedPatientId] = useState(preselectedId || '');
+  const [_selectedComplaint, setSelectedComplaint] = useState<ChiefComplaint | null>(null);
+  const [protocol, setProtocol] = useState<TriageProtocol | null>(null);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [redFlagsPresent, setRedFlagsPresent] = useState<Record<number, boolean>>({});
+  const [esiLevel, setEsiLevel] = useState<1 | 2 | 3 | 4 | 5>(3);
+  const [vitals, setVitals] = useState({ bp: '', hr: '', rr: '', temp: '', spo2: '', glucose: '', pain: 5 });
+  const [notes, setNotes] = useState('');
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    redFlags: true, steps: true, drugs: true, investigations: false, referrals: false,
   });
+  const [patientSearch, setPatientSearch] = useState('');
 
-  const watchedPatientId = watch('patientId');
-  const selectedPatient = patients.find((p) => p.id === watchedPatientId);
+  const selectedPatient = patients.find((p) => p.id === selectedPatientId);
+  const detectedRedFlagCount = Object.values(redFlagsPresent).filter(Boolean).length;
 
-  function onSubmit(data: TriageFormData) {
-    const now = new Date().toISOString();
-    const patient = patients.find((p) => p.id === data.patientId);
-    if (!patient) return;
-
-    // Ensure patient has an active encounter
-    let encounterId = patient.encounters.find((e) => e.status === 'active')?.id;
-    if (!encounterId) {
-      addEncounter(data.patientId, {
-        encounterType: 'emergency',
-        status: 'active',
-        admitDate: now,
-        chiefComplaint: data.chiefComplaint,
-        attendingPhysicianId: currentUser?.id || '',
-        attendingPhysicianName: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : '',
-      });
-      encounterId = 'enc-temp';
+  useEffect(() => {
+    if (detectedRedFlagCount > 0 && protocol) {
+      const minLevel = protocol.redFlags
+        .filter((_, i) => redFlagsPresent[i])
+        .reduce((min, rf) => Math.min(min, rf.esiLevel), 5);
+      setEsiLevel(minLevel as 1 | 2 | 3 | 4 | 5);
     }
+  }, [redFlagsPresent, protocol, detectedRedFlagCount]);
 
-    addTriageAssessment(data.patientId, {
-      patientId: data.patientId,
-      encounterId: encounterId,
-      triageNurseId: currentUser?.id || '',
-      triageNurseName: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : '',
-      arrivalTime: patient.registrationDate,
-      triageTime: now,
-      chiefComplaint: data.chiefComplaint,
-      onset: data.onset,
-      duration: data.duration,
-      severity: data.severity,
-      esiLevel: data.esiLevel as TriagePriority,
-      vitals: {
-        temperature: data.temperature,
-        temperatureUnit: data.temperatureUnit,
-        bloodPressureSystolic: data.bloodPressureSystolic,
-        bloodPressureDiastolic: data.bloodPressureDiastolic,
-        heartRate: data.heartRate,
-        respiratoryRate: data.respiratoryRate,
-        oxygenSaturation: data.oxygenSaturation,
-        weight: data.weight,
-        weightUnit: data.weightUnit,
-        height: data.height,
-        heightUnit: data.heightUnit,
-        painScore: data.painScore,
-        glucoseLevel: data.glucoseLevel,
-      },
-      symptoms: data.symptoms ? data.symptoms.split(',').map((s) => s.trim()).filter(Boolean) : [],
-      mechanism: data.mechanism,
-      notes: data.notes,
-      allergiesConfirmed: data.allergiesConfirmed,
-      medicationsConfirmed: data.medicationsConfirmed,
-    });
-
-    addVitals(data.patientId, {
-      timestamp: now,
-      recordedBy: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Triage',
-      temperature: data.temperature,
-      temperatureUnit: data.temperatureUnit,
-      bloodPressureSystolic: data.bloodPressureSystolic,
-      bloodPressureDiastolic: data.bloodPressureDiastolic,
-      heartRate: data.heartRate,
-      respiratoryRate: data.respiratoryRate,
-      oxygenSaturation: data.oxygenSaturation,
-      weight: data.weight,
-      weightUnit: data.weightUnit,
-      height: data.height,
-      heightUnit: data.heightUnit,
-      painScore: data.painScore,
-      glucoseLevel: data.glucoseLevel,
-    });
-
-    updatePatient(data.patientId, { status: 'in-triage' });
-
-    addNotification({
-      type: 'success',
-      title: 'Triage Completed',
-      message: `Triage for ${getPatientFullName(patient)} saved (ESI ${data.esiLevel}).`,
-    });
-    navigate(`/patients/${data.patientId}`);
+  function handleSelectComplaint(c: ChiefComplaint) {
+    setSelectedComplaint(c);
+    setProtocol(TRIAGE_PROTOCOLS[c]);
+    setAnswers({});
+    setRedFlagsPresent({});
+    setStep('assessment');
   }
 
+  function toggleSection(key: string) {
+    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  function handleSave() {
+    if (!selectedPatientId || !protocol) return;
+    const staffName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Staff';
+    const questionAnswers = protocol.questions
+      .map((q, i) => answers[i] ? `Q: ${q}\nA: ${answers[i]}` : null)
+      .filter(Boolean)
+      .join('\n\n');
+    addTriageAssessment(selectedPatientId, {
+      patientId: selectedPatientId,
+      triageNurse: staffName,
+      esiLevel,
+      chiefComplaint: protocol.label,
+      arrivalMode: 'walk-in',
+      timestamp: new Date().toISOString(),
+      vitalSigns: (vitals.bp || vitals.hr) ? {
+        bloodPressureSystolic: vitals.bp ? parseInt(vitals.bp.split('/')[0]) : undefined,
+        bloodPressureDiastolic: vitals.bp ? parseInt(vitals.bp.split('/')[1]) : undefined,
+        heartRate: vitals.hr ? parseInt(vitals.hr) : undefined,
+        respiratoryRate: vitals.rr ? parseInt(vitals.rr) : undefined,
+        temperature: vitals.temp ? parseFloat(vitals.temp) : undefined,
+        oxygenSaturation: vitals.spo2 ? parseInt(vitals.spo2) : undefined,
+        painScore: vitals.pain,
+      } : undefined,
+      notes: [
+        `NHS Triage Protocol: ${protocol.label}`,
+        detectedRedFlagCount > 0 ? `Red flags detected: ${detectedRedFlagCount}` : '',
+        questionAnswers,
+        notes,
+      ].filter(Boolean).join('\n\n'),
+    } as never);
+    addNotification({ type: 'success', title: 'Triage assessment saved', message: `ESI Level ${esiLevel} — ${protocol.label}` });
+    navigate(selectedPatientId ? `/patients/${selectedPatientId}` : '/queue');
+  }
+
+  const filteredPatients = patients.filter((p) => {
+    if (!patientSearch) return true;
+    const q = patientSearch.toLowerCase();
+    return getPatientFullName(p).toLowerCase().includes(q) || p.mrn.toLowerCase().includes(q);
+  });
+
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="space-y-4 max-w-5xl">
+      <div className="flex items-center gap-3">
         <button onClick={() => navigate(-1)} className="btn-secondary">
-          <ArrowLeft size={16} />
-          Back
+          <ArrowLeft size={16} /> Back
         </button>
         <div>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Activity size={22} className="text-orange-500" />
-            Triage Assessment
+            <Stethoscope size={20} className="text-blue-600" />
+            NHS-Style Clinical Triage
           </h1>
-          <p className="text-sm text-gray-500">Emergency Severity Index Assessment</p>
+          <p className="text-sm text-gray-500">Evidence-based triage with clinical decision support</p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Patient Selection */}
-        <div className="card">
-          <h2 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b">Patient Selection</h2>
-          <div>
-            <label className="label">Select Patient *</label>
-            <select {...register('patientId')} className="select-field">
-              <option value="">-- Select a patient --</option>
-              {activePatients.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {getPatientFullName(p)} · {p.mrn} · Age {calculateAge(p.dateOfBirth)}
-                </option>
-              ))}
-            </select>
-            {errors.patientId && <p className="form-error">{errors.patientId.message}</p>}
+      {/* Progress Stepper */}
+      <div className="flex gap-1 items-center text-xs font-medium flex-wrap">
+        {[
+          { key: 'select-patient', label: '1. Patient' },
+          { key: 'select-complaint', label: '2. Chief Complaint' },
+          { key: 'assessment', label: '3. Assessment' },
+          { key: 'guidance', label: '4. Clinical Guidance' },
+        ].map(({ key, label }, i, arr) => (
+          <div key={key} className="flex items-center gap-1">
+            <span className={`px-3 py-1 rounded-full ${step === key ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+              {label}
+            </span>
+            {i < arr.length - 1 && <ArrowRight size={12} className="text-gray-300" />}
           </div>
+        ))}
+      </div>
+
+      {/* Step 1: Select Patient */}
+      {step === 'select-patient' && (
+        <div className="card p-6">
+          <h2 className="font-semibold text-gray-900 mb-4">Select Patient to Triage</h2>
+          <input
+            value={patientSearch}
+            onChange={(e) => setPatientSearch(e.target.value)}
+            placeholder="Search by name or MRN..."
+            className="input-field mb-4"
+          />
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {filteredPatients.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => { setSelectedPatientId(p.id); setStep('select-complaint'); }}
+                className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
+              >
+                <span className="font-medium text-gray-900">{getPatientFullName(p)}</span>
+                <span className="text-sm text-gray-500 ml-2">MRN: {p.mrn}</span>
+                <span className="ml-2 text-xs text-gray-400 capitalize">{p.status}</span>
+              </button>
+            ))}
+            {filteredPatients.length === 0 && <p className="text-gray-400 text-center py-8">No patients found.</p>}
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Select Chief Complaint */}
+      {step === 'select-complaint' && (
+        <div className="card p-6">
           {selectedPatient && (
-            <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <div>
-                  <p className="text-xs text-gray-500">Patient</p>
-                  <p className="font-semibold">{getPatientFullName(selectedPatient)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">MRN</p>
-                  <p className="font-semibold">{selectedPatient.mrn}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">DOB / Age</p>
-                  <p className="font-semibold">{selectedPatient.dateOfBirth} ({calculateAge(selectedPatient.dateOfBirth)}y)</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Blood Type</p>
-                  <p className="font-semibold">{selectedPatient.bloodType}</p>
-                </div>
-              </div>
-              {selectedPatient.allergies.filter((a) => a.status === 'active').length > 0 && (
-                <div className="mt-3 flex items-center gap-2 text-red-600">
-                  <AlertCircle size={16} />
-                  <span className="text-xs font-semibold">
-                    ALLERGIES: {selectedPatient.allergies.filter((a) => a.status === 'active').map((a) => a.allergen).join(', ')}
-                  </span>
-                </div>
-              )}
+            <div className="bg-blue-50 rounded-lg p-3 mb-4 flex items-center gap-2 text-sm">
+              <Activity size={16} className="text-blue-600" />
+              <span>Patient: <strong>{getPatientFullName(selectedPatient)}</strong> · MRN: {selectedPatient.mrn}</span>
             </div>
           )}
-        </div>
-
-        {/* ESI Level */}
-        <div className="card">
-          <h2 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b">Emergency Severity Index (ESI)</h2>
-          <div className="grid grid-cols-5 gap-2">
-            {([1, 2, 3, 4, 5] as TriagePriority[]).map((level) => (
+          <h2 className="font-semibold text-gray-900 mb-4">What is the chief complaint / presenting problem?</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {COMPLAINT_OPTIONS.map(({ value, label }) => (
               <button
-                key={level}
-                type="button"
-                onClick={() => { setSelectedESI(level); setValue('esiLevel', level); }}
-                className={`p-3 rounded-xl border-2 text-center transition-all ${
-                  selectedESI === level
-                    ? `${ESI_COLORS[level]} border-transparent shadow-md`
-                    : 'border-gray-200 hover:border-gray-300 bg-white'
-                }`}
+                key={value}
+                onClick={() => handleSelectComplaint(value as ChiefComplaint)}
+                className="text-left p-4 border-2 border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all"
               >
-                <div className="text-2xl font-bold mb-1">{level}</div>
-                <div className="text-xs font-medium">{ESI_LABELS[level]}</div>
-                <div className={`text-xs mt-1 ${selectedESI === level ? 'opacity-80' : 'text-gray-400'}`}>
-                  {ESI_DESCRIPTIONS[level]}
-                </div>
+                <span className="font-medium text-gray-900">{label}</span>
               </button>
             ))}
           </div>
-          <input type="hidden" {...register('esiLevel', { valueAsNumber: true })} />
+          <button onClick={() => setStep('select-patient')} className="btn-secondary mt-4"><ArrowLeft size={16} />Back</button>
         </div>
+      )}
 
-        {/* Chief Complaint */}
-        <div className="card">
-          <h2 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b">Chief Complaint & History</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="label">Chief Complaint *</label>
-              <input {...register('chiefComplaint')} className="input-field" placeholder="e.g., Chest pain, shortness of breath" />
-              {errors.chiefComplaint && <p className="form-error">{errors.chiefComplaint.message}</p>}
+      {/* Step 3: Assessment */}
+      {step === 'assessment' && protocol && (
+        <div className="space-y-4">
+          {selectedPatient && (
+            <div className="bg-blue-50 rounded-lg p-3 flex items-center gap-2 text-sm">
+              <Activity size={16} className="text-blue-600" />
+              <strong>{getPatientFullName(selectedPatient)}</strong>
+              <span className="text-gray-500">· Chief Complaint: <strong className="text-gray-700">{protocol.label}</strong></span>
             </div>
-            <div>
-              <label className="label">Onset *</label>
-              <select {...register('onset')} className="select-field">
-                <option value="">Select onset</option>
-                <option>Sudden</option>
-                <option>Gradual</option>
-                <option>Intermittent</option>
-                <option>Progressive</option>
-              </select>
-              {errors.onset && <p className="form-error">{errors.onset.message}</p>}
-            </div>
-            <div>
-              <label className="label">Duration *</label>
-              <input {...register('duration')} className="input-field" placeholder="e.g., 2 hours, 3 days" />
-              {errors.duration && <p className="form-error">{errors.duration.message}</p>}
-            </div>
-            <div>
-              <label className="label">Severity (1-10)</label>
-              <div className="flex items-center gap-3">
-                <input
-                  {...register('severity', { valueAsNumber: true })}
-                  type="range" min="1" max="10"
-                  className="flex-1 accent-blue-600"
-                />
-                <span className="w-8 text-center font-bold text-lg text-gray-900">{watch('severity')}</span>
+          )}
+
+          {/* Red Flags */}
+          <div className="bg-white rounded-xl border-l-4 border-red-500 shadow-sm overflow-hidden">
+            <button onClick={() => toggleSection('redFlags')} className="flex w-full items-center justify-between p-4 font-semibold text-red-700 hover:bg-red-50">
+              <span className="flex items-center gap-2"><AlertTriangle size={16} /> Red Flags — Check These First</span>
+              {expandedSections.redFlags ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            {expandedSections.redFlags && (
+              <div className="px-4 pb-4 space-y-2">
+                <p className="text-xs text-gray-500 mb-3">Tick any red flags present in this patient:</p>
+                {protocol.redFlags.map((rf, i) => (
+                  <label key={i} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${redFlagsPresent[i] ? 'border-red-400 bg-red-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <input
+                      type="checkbox"
+                      checked={!!redFlagsPresent[i]}
+                      onChange={(e) => setRedFlagsPresent({ ...redFlagsPresent, [i]: e.target.checked })}
+                      className="mt-0.5 accent-red-600"
+                    />
+                    <div>
+                      <p className="font-medium text-gray-900 text-sm">{rf.symptom}</p>
+                      <p className="text-xs text-red-600 mt-0.5">⚠ Indicates ESI {rf.esiLevel} — {rf.reason}</p>
+                    </div>
+                  </label>
+                ))}
+                {detectedRedFlagCount > 0 && (
+                  <div className="mt-3 p-3 bg-red-600 text-white rounded-lg font-semibold flex items-center gap-2 text-sm">
+                    <AlertTriangle size={16} />
+                    {detectedRedFlagCount} red flag(s) detected — triage level auto-set to ESI {esiLevel}
+                  </div>
+                )}
               </div>
-            </div>
-            <div>
-              <label className="label">Mechanism of Injury</label>
-              <input {...register('mechanism')} className="input-field" placeholder="e.g., Fall, MVA, assault" />
-            </div>
-            <div className="md:col-span-2">
-              <label className="label">Symptoms (comma-separated)</label>
-              <input {...register('symptoms')} className="input-field" placeholder="e.g., Headache, fever, nausea" />
-            </div>
-            <div className="md:col-span-2">
-              <label className="label">Triage Notes</label>
-              <textarea {...register('notes')} rows={3} className="textarea-field" placeholder="Additional clinical notes..." />
+            )}
+          </div>
+
+          {/* Patient Questions */}
+          <div className="card p-4">
+            <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Info size={16} className="text-blue-600" /> Patient Assessment Questions
+            </h3>
+            <div className="space-y-4">
+              {protocol.questions.map((q, i) => (
+                <div key={i}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <span className="text-blue-600 font-bold mr-1">{i + 1}.</span> {q}
+                  </label>
+                  <textarea
+                    value={answers[i] || ''}
+                    onChange={(e) => setAnswers({ ...answers, [i]: e.target.value })}
+                    className="textarea-field"
+                    rows={2}
+                    placeholder="Patient's response..."
+                  />
+                </div>
+              ))}
             </div>
           </div>
-        </div>
 
-        {/* Vitals */}
-        <div className="card">
-          <h2 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b">Vital Signs</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div>
-              <label className="label">Temperature</label>
-              <div className="flex gap-2">
+          {/* Vitals */}
+          <div className="card p-4">
+            <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Activity size={16} className="text-green-600" /> Vital Signs
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {[
+                { label: 'Blood Pressure', key: 'bp', placeholder: '120/80 mmHg' },
+                { label: 'Heart Rate', key: 'hr', placeholder: '88 bpm' },
+                { label: 'Respiratory Rate', key: 'rr', placeholder: '16 /min' },
+                { label: 'Temperature', key: 'temp', placeholder: '37.5 °C' },
+                { label: 'SpO2', key: 'spo2', placeholder: '98 %' },
+                { label: 'Blood Glucose', key: 'glucose', placeholder: '5.4 mmol/L' },
+              ].map(({ label, key, placeholder }) => (
+                <div key={key}>
+                  <label className="label">{label}</label>
+                  <input
+                    value={(vitals as Record<string, string | number>)[key] as string}
+                    onChange={(e) => setVitals({ ...vitals, [key]: e.target.value })}
+                    className="input-field"
+                    placeholder={placeholder}
+                  />
+                </div>
+              ))}
+              <div className="col-span-2 md:col-span-3">
+                <label className="label">Pain Score: <strong>{vitals.pain}/10</strong></label>
                 <input
-                  {...register('temperature', { valueAsNumber: true })}
-                  type="number" step="0.1" className="input-field"
-                  placeholder="36.8"
+                  type="range" min={0} max={10} value={vitals.pain}
+                  onChange={(e) => setVitals({ ...vitals, pain: +e.target.value })}
+                  className="w-full accent-blue-600"
                 />
-                <select {...register('temperatureUnit')} className="select-field w-20">
-                  <option value="C">°C</option>
-                  <option value="F">°F</option>
-                </select>
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>0 — No pain</span><span>5 — Moderate</span><span>10 — Worst possible</span>
+                </div>
               </div>
-            </div>
-            <div>
-              <label className="label">Blood Pressure</label>
-              <div className="flex gap-1 items-center">
-                <input
-                  {...register('bloodPressureSystolic', { valueAsNumber: true })}
-                  type="number" className="input-field"
-                  placeholder="120"
-                />
-                <span className="text-gray-400">/</span>
-                <input
-                  {...register('bloodPressureDiastolic', { valueAsNumber: true })}
-                  type="number" className="input-field"
-                  placeholder="80"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="label">Heart Rate (bpm)</label>
-              <input
-                {...register('heartRate', { valueAsNumber: true })}
-                type="number" className="input-field"
-                placeholder="72"
-              />
-            </div>
-            <div>
-              <label className="label">Resp. Rate (/min)</label>
-              <input
-                {...register('respiratoryRate', { valueAsNumber: true })}
-                type="number" className="input-field"
-                placeholder="16"
-              />
-            </div>
-            <div>
-              <label className="label">SpO2 (%)</label>
-              <input
-                {...register('oxygenSaturation', { valueAsNumber: true })}
-                type="number" min="0" max="100" className="input-field"
-                placeholder="98"
-              />
-            </div>
-            <div>
-              <label className="label">Pain Score (0-10)</label>
-              <input
-                {...register('painScore', { valueAsNumber: true })}
-                type="number" min="0" max="10" className="input-field"
-                placeholder="0"
-              />
-            </div>
-            <div>
-              <label className="label">Weight</label>
-              <div className="flex gap-2">
-                <input
-                  {...register('weight', { valueAsNumber: true })}
-                  type="number" step="0.1" className="input-field"
-                  placeholder="70"
-                />
-                <select {...register('weightUnit')} className="select-field w-20">
-                  <option value="kg">kg</option>
-                  <option value="lbs">lbs</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="label">Height</label>
-              <div className="flex gap-2">
-                <input
-                  {...register('height', { valueAsNumber: true })}
-                  type="number" step="0.1" className="input-field"
-                  placeholder="170"
-                />
-                <select {...register('heightUnit')} className="select-field w-20">
-                  <option value="cm">cm</option>
-                  <option value="in">in</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="label">Blood Glucose (mg/dL)</label>
-              <input
-                {...register('glucoseLevel', { valueAsNumber: true })}
-                type="number" className="input-field"
-                placeholder="90"
-              />
             </div>
           </div>
-        </div>
 
-        {/* Confirmations */}
-        <div className="card">
-          <h2 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b">Confirmations</h2>
-          <div className="space-y-3">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input {...register('allergiesConfirmed')} type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600" />
-              <span className="text-sm text-gray-700">Allergies confirmed and documented</span>
-            </label>
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input {...register('medicationsConfirmed')} type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-600" />
-              <span className="text-sm text-gray-700">Current medications confirmed and documented</span>
-            </label>
+          {/* ESI Level */}
+          <div className="card p-4">
+            <h3 className="font-semibold text-gray-900 mb-3">ESI Triage Level Assignment</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
+              {([1, 2, 3, 4, 5] as const).map((level) => {
+                const cfg = ESI_CONFIG[level];
+                return (
+                  <button
+                    key={level}
+                    onClick={() => setEsiLevel(level)}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${esiLevel === level ? `${cfg.color} ${cfg.border} shadow-md` : 'border-gray-200 hover:border-gray-400'}`}
+                  >
+                    <p className={`font-bold text-sm ${esiLevel === level ? '' : 'text-gray-900'}`}>ESI {level}</p>
+                    <p className={`text-xs mt-0.5 ${esiLevel === level ? 'opacity-90' : 'text-gray-500'}`}>{cfg.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="card p-4">
+            <h3 className="font-semibold text-gray-900 mb-2">Additional Triage Notes</h3>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="textarea-field" rows={3} placeholder="Clinical observations, concerns, or context..." />
+          </div>
+
+          <div className="flex gap-3">
+            <button onClick={() => setStep('select-complaint')} className="btn-secondary"><ArrowLeft size={16} /> Back</button>
+            <button onClick={() => setStep('guidance')} className="btn-primary">View Clinical Guidance <ArrowRight size={16} /></button>
           </div>
         </div>
+      )}
 
-        <div className="flex gap-3 justify-end">
-          <button type="button" onClick={() => navigate(-1)} className="btn-secondary">Cancel</button>
-          <button type="submit" disabled={isSubmitting} className="btn-primary">
-            <Save size={16} />
-            Save Triage Assessment
-          </button>
+      {/* Step 4: Clinical Guidance */}
+      {step === 'guidance' && protocol && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className={`px-4 py-2 rounded-full font-bold text-sm ${ESI_CONFIG[esiLevel].color}`}>
+              {ESI_CONFIG[esiLevel].label}
+            </span>
+            <span className="text-gray-600 text-sm font-medium">{protocol.label}</span>
+            {detectedRedFlagCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm font-medium">
+                <AlertTriangle size={14} /> {detectedRedFlagCount} red flag(s) active
+              </span>
+            )}
+          </div>
+
+          {/* Immediate Steps */}
+          <CollapsibleSection
+            title="Immediate Clinical Steps"
+            icon={<CheckCircle size={16} className="text-green-600" />}
+            expanded={expandedSections.steps}
+            onToggle={() => toggleSection('steps')}
+          >
+            <ol className="space-y-2">
+              {protocol.initialSteps.map((s, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <span className="flex-shrink-0 w-6 h-6 bg-green-600 text-white rounded-full text-xs flex items-center justify-center font-bold">{i + 1}</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{s.step}</p>
+                    {s.detail && <p className="text-xs text-blue-700 mt-0.5 italic">{s.detail}</p>}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </CollapsibleSection>
+
+          {/* Drug Recommendations */}
+          {protocol.suggestedDrugs.length > 0 && (
+            <CollapsibleSection
+              title="Drug & Medication Recommendations"
+              icon={<Pill size={16} className="text-blue-600" />}
+              expanded={expandedSections.drugs}
+              onToggle={() => toggleSection('drugs')}
+            >
+              <div className="space-y-3">
+                {protocol.suggestedDrugs.map((drug, i) => (
+                  <div key={i} className="border border-blue-200 rounded-lg p-3 bg-blue-50">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-blue-900">{drug.name}</p>
+                      <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full flex-shrink-0">{drug.route}</span>
+                    </div>
+                    <p className="text-sm text-gray-800 mt-1"><span className="font-medium">Dose:</span> {drug.dose}</p>
+                    <p className="text-xs text-gray-600 mt-0.5"><span className="font-medium">Indication:</span> {drug.indication}</p>
+                    {drug.notes && <p className="text-xs text-amber-700 mt-1 italic">⚠ {drug.notes}</p>}
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
+
+          {/* Investigations */}
+          <CollapsibleSection
+            title="Suggested Investigations"
+            icon={<FlaskConical size={16} className="text-purple-600" />}
+            expanded={expandedSections.investigations}
+            onToggle={() => toggleSection('investigations')}
+          >
+            <div className="flex flex-wrap gap-2">
+              {protocol.investigations.map((inv, i) => (
+                <span key={i} className="text-xs px-3 py-1 bg-purple-50 text-purple-800 rounded-full border border-purple-200">
+                  {inv}
+                </span>
+              ))}
+            </div>
+          </CollapsibleSection>
+
+          {/* Referrals */}
+          {protocol.referrals.length > 0 && (
+            <CollapsibleSection
+              title="Referral & Transfer Recommendations"
+              icon={<Phone size={16} className="text-red-600" />}
+              expanded={expandedSections.referrals}
+              onToggle={() => toggleSection('referrals')}
+            >
+              <div className="space-y-2">
+                {protocol.referrals.map((ref, i) => (
+                  <div key={i} className={`flex items-start gap-3 p-3 rounded-lg border ${
+                    ref.urgency === 'immediate' ? 'border-red-300 bg-red-50' :
+                    ref.urgency === 'urgent' ? 'border-orange-300 bg-orange-50' : 'border-gray-200 bg-gray-50'
+                  }`}>
+                    <MapPin size={14} className={`mt-0.5 flex-shrink-0 ${ref.urgency === 'immediate' ? 'text-red-600' : 'text-orange-500'}`} />
+                    <div>
+                      <p className="font-semibold text-gray-900 text-sm">{ref.destination}</p>
+                      <p className="text-xs text-gray-600 mt-0.5">{ref.reason}</p>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full mt-1 inline-block ${
+                        ref.urgency === 'immediate' ? 'bg-red-600 text-white' :
+                        ref.urgency === 'urgent' ? 'bg-orange-500 text-white' : 'bg-gray-300 text-gray-700'
+                      }`}>
+                        {ref.urgency.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
+
+          {/* Disposition */}
+          <div className="card p-4">
+            <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+              <CheckCircle size={16} className="text-blue-600" /> Possible Dispositions
+            </h3>
+            <ul className="space-y-1">
+              {protocol.dispositionOptions.map((d, i) => (
+                <li key={i} className="text-sm text-gray-700 flex items-start gap-2">
+                  <span className="text-blue-500 mt-0.5 flex-shrink-0">→</span> {d}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="flex gap-3">
+            <button onClick={() => setStep('assessment')} className="btn-secondary"><ArrowLeft size={16} /> Back</button>
+            <PermissionGate permission="triage:create">
+              <button onClick={handleSave} className="btn-success">
+                <Save size={16} /> Save Triage Assessment
+              </button>
+            </PermissionGate>
+          </div>
         </div>
-      </form>
+      )}
+    </div>
+  );
+}
+
+interface CollapsibleSectionProps {
+  title: string;
+  icon: React.ReactNode;
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+function CollapsibleSection({ title, icon, expanded, onToggle, children }: CollapsibleSectionProps) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <button onClick={onToggle} className="flex w-full items-center justify-between p-4 font-semibold text-gray-900 hover:bg-gray-50 transition-colors">
+        <span className="flex items-center gap-2">{icon}{title}</span>
+        {expanded ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+      </button>
+      {expanded && <div className="px-4 pb-4">{children}</div>}
     </div>
   );
 }

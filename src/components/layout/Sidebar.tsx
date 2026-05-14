@@ -2,10 +2,11 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, Activity,
   Pill, FlaskConical, Scan, UserCog, BarChart3,
-  Settings, Menu, X, Stethoscope, ChevronRight
+  Settings, Menu, X, Stethoscope, ChevronRight, Package, Baby
 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useStaffStore } from '../../store/staffStore';
+import { ROLE_LABELS } from '../../utils/permissions';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
@@ -14,8 +15,10 @@ const navItems = [
   { to: '/triage', icon: Activity, label: 'Triage' },
   { to: '/vitals', icon: Stethoscope, label: 'Vitals' },
   { to: '/medications', icon: Pill, label: 'Medications' },
+  { to: '/drug-stock', icon: Package, label: 'Drug Stock' },
   { to: '/labs', icon: FlaskConical, label: 'Lab Results' },
   { to: '/imaging', icon: Scan, label: 'Imaging' },
+  { to: '/maternity', icon: Baby, label: 'Maternity & Paeds' },
   { to: '/staff', icon: UserCog, label: 'Staff' },
   { to: '/reports', icon: BarChart3, label: 'Reports' },
   { to: '/settings', icon: Settings, label: 'Settings' },
@@ -23,7 +26,7 @@ const navItems = [
 
 export default function Sidebar() {
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
-  const { currentUser } = useStaffStore();
+  const { currentUser, staff, setCurrentUser } = useStaffStore();
 
   return (
     <aside
@@ -82,9 +85,9 @@ export default function Sidebar() {
         </ul>
       </nav>
 
-      {/* User Profile */}
+      {/* User Profile + Role Switcher */}
       {currentUser && (
-        <div className="p-4 border-t border-slate-700">
+        <div className="p-3 border-t border-slate-700 space-y-2">
           <div className={`flex items-center gap-3 ${sidebarCollapsed ? 'justify-center' : ''}`}>
             <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
               <span className="text-white text-xs font-bold">
@@ -96,10 +99,29 @@ export default function Sidebar() {
                 <p className="text-sm font-medium truncate">
                   {currentUser.firstName} {currentUser.lastName}
                 </p>
-                <p className="text-xs text-slate-400 capitalize">{currentUser.role}</p>
+                <p className="text-xs text-slate-400">{currentUser.role ? ROLE_LABELS[currentUser.role] : ''}</p>
               </div>
             )}
           </div>
+          {!sidebarCollapsed && (
+            <div>
+              <p className="text-xs text-slate-500 mb-1">Switch User (RBAC test)</p>
+              <select
+                value={currentUser.id}
+                onChange={(e) => {
+                  const s = staff.find((st) => st.id === e.target.value);
+                  if (s) setCurrentUser(s);
+                }}
+                className="w-full bg-slate-800 text-slate-200 text-xs rounded px-2 py-1 border border-slate-600 focus:outline-none focus:border-blue-500"
+              >
+                {staff.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.firstName} {s.lastName} ({s.role ? ROLE_LABELS[s.role] : s.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
     </aside>

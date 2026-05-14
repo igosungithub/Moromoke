@@ -13,6 +13,8 @@ import ImagingPage from './pages/ImagingPage';
 import StaffPage from './pages/StaffPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
+import DrugStockPage from './pages/DrugStockPage';
+import MaternityPage from './pages/MaternityPage';
 
 export default function App() {
   return (
@@ -29,6 +31,8 @@ export default function App() {
           <Route path="/medications" element={<MedicationsPage />} />
           <Route path="/labs" element={<LabsPage />} />
           <Route path="/imaging" element={<ImagingPage />} />
+          <Route path="/drug-stock" element={<DrugStockPage />} />
+          <Route path="/maternity" element={<MaternityPage />} />
           <Route path="/staff" element={<StaffPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
