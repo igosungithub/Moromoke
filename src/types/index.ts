@@ -87,6 +87,17 @@ export interface Vitals {
   notes?: string;
 }
 
+export interface AttachedDocument {
+  id: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  dataUrl: string;            // base64 data URL
+  uploadedAt: string;
+  uploadedBy: string;
+  description?: string;
+}
+
 export interface LabResult {
   id: string;
   patientId: string;
@@ -100,6 +111,7 @@ export interface LabResult {
   results?: LabResultItem[];
   notes?: string;
   priority: 'routine' | 'urgent' | 'stat';
+  attachments?: AttachedDocument[];
 }
 
 export interface LabResultItem {
@@ -126,6 +138,7 @@ export interface ImagingOrder {
   impression?: string;
   radiologist?: string;
   notes?: string;
+  attachments?: AttachedDocument[];
 }
 
 export interface ClinicalNote {
@@ -247,6 +260,10 @@ export interface Staff {
   shift?: 'day' | 'evening' | 'night' | 'rotating';
   hireDate: string;
   npi?: string;
+  username: string;
+  passwordHash: string;
+  mustChangePassword?: boolean;
+  lastLoginAt?: string;
 }
 
 export interface QueueEntry {

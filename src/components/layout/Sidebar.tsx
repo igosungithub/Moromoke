@@ -1,8 +1,8 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, Activity,
   Pill, FlaskConical, Scan, UserCog, BarChart3,
-  Settings, Menu, X, Stethoscope, ChevronRight, Package, Baby
+  Settings, Menu, X, Stethoscope, ChevronRight, Package, Baby, LogOut
 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useStaffStore } from '../../store/staffStore';
@@ -25,8 +25,14 @@ const navItems = [
 ];
 
 export default function Sidebar() {
+  const navigate = useNavigate();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
-  const { currentUser, staff, setCurrentUser } = useStaffStore();
+  const { currentUser, logout } = useStaffStore();
+
+  function handleLogout() {
+    logout();
+    navigate('/login', { replace: true });
+  }
 
   return (
     <aside
@@ -85,7 +91,7 @@ export default function Sidebar() {
         </ul>
       </nav>
 
-      {/* User Profile + Role Switcher */}
+      {/* User Profile + Logout */}
       {currentUser && (
         <div className="p-3 border-t border-slate-700 space-y-2">
           <div className={`flex items-center gap-3 ${sidebarCollapsed ? 'justify-center' : ''}`}>
@@ -95,33 +101,25 @@ export default function Sidebar() {
               </span>
             </div>
             {!sidebarCollapsed && (
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium truncate">
                   {currentUser.firstName} {currentUser.lastName}
                 </p>
                 <p className="text-xs text-slate-400">{currentUser.role ? ROLE_LABELS[currentUser.role] : ''}</p>
+                {currentUser.username && (
+                  <p className="text-[10px] text-slate-500 font-mono truncate">@{currentUser.username}</p>
+                )}
               </div>
             )}
           </div>
-          {!sidebarCollapsed && (
-            <div>
-              <p className="text-xs text-slate-500 mb-1">Switch User (RBAC test)</p>
-              <select
-                value={currentUser.id}
-                onChange={(e) => {
-                  const s = staff.find((st) => st.id === e.target.value);
-                  if (s) setCurrentUser(s);
-                }}
-                className="w-full bg-slate-800 text-slate-200 text-xs rounded px-2 py-1 border border-slate-600 focus:outline-none focus:border-blue-500"
-              >
-                {staff.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.firstName} {s.lastName} ({s.role ? ROLE_LABELS[s.role] : s.role})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <button
+            onClick={handleLogout}
+            title="Sign out"
+            className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 hover:bg-red-600 hover:text-white transition-colors ${sidebarCollapsed ? 'px-2' : ''}`}
+          >
+            <LogOut size={14} />
+            {!sidebarCollapsed && <span>Sign out</span>}
+          </button>
         </div>
       )}
     </aside>

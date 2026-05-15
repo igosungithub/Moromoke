@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Scan, Plus, Edit, Save, X, ArrowLeft } from 'lucide-react';
+import { Scan, Plus, Edit, Save, X, ArrowLeft, Paperclip, FileText, Image as ImageIcon, Download } from 'lucide-react';
 import { usePatientStore } from '../store/patientStore';
 import { useStaffStore } from '../store/staffStore';
 import { useUIStore } from '../store/uiStore';
 import { getPatientFullName, calculateAge, formatDateTime } from '../utils/helpers';
 import Modal from '../components/ui/Modal';
+import DocumentUpload from '../components/ui/DocumentUpload';
 import type { ImagingOrder } from '../types';
 
 const MODALITIES = ['X-Ray', 'CT Scan', 'MRI', 'Ultrasound', 'Fluoroscopy', 'Nuclear Medicine', 'PET Scan', 'Mammography', 'DEXA'];
@@ -21,7 +22,7 @@ export default function ImagingPage() {
   const [selectedPatientId, setSelectedPatientId] = useState(searchParams.get('patientId') || '');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<Partial<ImagingOrder>>({ status: 'ordered', priority: 'routine', modality: MODALITIES[0], bodyPart: BODY_PARTS[0] });
+  const [form, setForm] = useState<Partial<ImagingOrder>>({ status: 'ordered', priority: 'routine', modality: MODALITIES[0], bodyPart: BODY_PARTS[0], attachments: [] });
 
   const activePatients = patients.filter((p) => !['discharged', 'transferred'].includes(p.status));
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
@@ -32,6 +33,7 @@ export default function ImagingPage() {
       modality: MODALITIES[0], bodyPart: BODY_PARTS[0],
       orderedDate: new Date().toISOString(),
       orderedBy: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : '',
+      attachments: [],
     });
     setEditingId(null);
     setShowModal(true);
@@ -106,9 +108,48 @@ export default function ImagingPage() {
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${img.status === 'completed' ? 'badge-green' : img.status === 'in-progress' ? 'badge-blue' : 'badge-gray'}`}>
                         {img.status}
                       </span>
-                      <button onClick={() => { setForm(img); setEditingId(img.id); setShowModal(true); }} className="text-blue-600 hover:text-blue-700"><Edit size={15} /></button>
+                      {img.attachments && img.attachments.length > 0 && (
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-indigo-50 text-indigo-700 rounded-full" title="Attached images / reports">
+                          <Paperclip size={12} /> {img.attachments.length}
+                        </span>
+                      )}
+                      <button onClick={() => { setForm({ ...img, attachments: img.attachments || [] }); setEditingId(img.id); setShowModal(true); }} className="text-blue-600 hover:text-blue-700"><Edit size={15} /></button>
                     </div>
                   </div>
+                  {/* Attached imaging files */}
+                  {img.attachments && img.attachments.length > 0 && (
+                    <div className="mt-3 border-t pt-2">
+                      <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                        <Paperclip size={12} /> Imaging Files ({img.attachments.length})
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                        {img.attachments.map((a) => (
+                          <a
+                            key={a.id}
+                            href={a.dataUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="border border-gray-200 rounded overflow-hidden hover:border-indigo-400 transition-colors group"
+                            title={a.filename}
+                          >
+                            {a.mimeType.startsWith('image/') ? (
+                              <img src={a.dataUrl} alt={a.filename} className="w-full h-24 object-cover" />
+                            ) : (
+                              <div className="w-full h-24 bg-gray-100 flex items-center justify-center">
+                                {a.mimeType === 'application/pdf' ? <FileText size={28} className="text-red-600" /> : <ImageIcon size={28} className="text-gray-500" />}
+                              </div>
+                            )}
+                            <div className="p-1.5 text-xs bg-white">
+                              <p className="font-medium text-gray-900 truncate text-[10px]">{a.filename}</p>
+                              <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                                <Download size={9} /> {(a.sizeBytes / 1024).toFixed(0)} KB
+                              </p>
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {img.findings && (
                     <div className="mt-3 bg-gray-50 rounded p-3 text-sm">
                       <p className="font-medium text-gray-700">Findings: <span className="font-normal text-gray-600">{img.findings}</span></p>
@@ -180,6 +221,18 @@ export default function ImagingPage() {
               <textarea value={form.impression || ''} onChange={(e) => setForm({ ...form, impression: e.target.value })} className="textarea-field" rows={2} placeholder="Radiologist impression..." />
             </div>
           </div>
+
+          <div className="border-t pt-3">
+            <DocumentUpload
+              attachments={form.attachments || []}
+              onChange={(att) => setForm({ ...form, attachments: att })}
+              label="Imaging files / radiology report"
+              accept="application/pdf,image/*,.dcm"
+              maxFileMB={10}
+              maxTotalMB={30}
+            />
+          </div>
+
           <div className="flex gap-3 justify-end">
             <button onClick={() => setShowModal(false)} className="btn-secondary"><X size={16} />Cancel</button>
             <button onClick={saveOrder} className="btn-primary"><Save size={16} />Save</button>

@@ -1,5 +1,8 @@
 import type { Patient, Staff } from '../types';
+import { DEFAULT_PASSWORD_HASH } from './auth';
 
+// All sample staff ship with default password "password" and are flagged
+// mustChangePassword=true. They are prompted to change it on first login.
 export const sampleStaff: Staff[] = [
   {
     id: 'staff-1',
@@ -16,6 +19,9 @@ export const sampleStaff: Staff[] = [
     shift: 'day',
     hireDate: '2018-03-15',
     npi: '1234567890',
+    username: 'sjohnson',
+    passwordHash: DEFAULT_PASSWORD_HASH,
+    mustChangePassword: true,
   },
   {
     id: 'staff-2',
@@ -32,6 +38,9 @@ export const sampleStaff: Staff[] = [
     shift: 'evening',
     hireDate: '2020-07-01',
     npi: '0987654321',
+    username: 'mokonkwo',
+    passwordHash: DEFAULT_PASSWORD_HASH,
+    mustChangePassword: true,
   },
   {
     id: 'staff-3',
@@ -45,6 +54,9 @@ export const sampleStaff: Staff[] = [
     status: 'active',
     shift: 'day',
     hireDate: '2019-11-20',
+    username: 'adeyemi',
+    passwordHash: DEFAULT_PASSWORD_HASH,
+    mustChangePassword: true,
   },
   {
     id: 'staff-4',
@@ -58,6 +70,9 @@ export const sampleStaff: Staff[] = [
     status: 'active',
     shift: 'night',
     hireDate: '2021-01-10',
+    username: 'fatima',
+    passwordHash: DEFAULT_PASSWORD_HASH,
+    mustChangePassword: true,
   },
   {
     id: 'staff-5',
@@ -72,6 +87,25 @@ export const sampleStaff: Staff[] = [
     status: 'active',
     shift: 'rotating',
     hireDate: '2022-04-05',
+    username: 'bnwosu',
+    passwordHash: DEFAULT_PASSWORD_HASH,
+    mustChangePassword: true,
+  },
+  {
+    id: 'staff-admin',
+    employeeId: 'ADM001',
+    firstName: 'System',
+    lastName: 'Administrator',
+    role: 'admin',
+    department: 'Administration',
+    phone: '555-0000',
+    email: 'admin@moromoke.hospital',
+    status: 'active',
+    shift: 'day',
+    hireDate: '2018-01-01',
+    username: 'admin',
+    passwordHash: DEFAULT_PASSWORD_HASH,
+    mustChangePassword: true,
   },
 ];
 

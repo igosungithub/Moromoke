@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { FlaskConical, Plus, Edit, Save, X, ArrowLeft } from 'lucide-react';
+import { FlaskConical, Plus, Edit, Save, X, ArrowLeft, Paperclip, FileText, Image as ImageIcon, Download } from 'lucide-react';
 import { usePatientStore } from '../store/patientStore';
 import { useStaffStore } from '../store/staffStore';
 import { useUIStore } from '../store/uiStore';
 import { getPatientFullName, calculateAge, formatDateTime } from '../utils/helpers';
 import Modal from '../components/ui/Modal';
-import type { LabResult, LabResultItem } from '../types';
+import DocumentUpload from '../components/ui/DocumentUpload';
+import type { LabResult, LabResultItem, AttachedDocument } from '../types';
 
 const LAB_CATEGORIES = [
   'Complete Blood Count (CBC)', 'Basic Metabolic Panel', 'Comprehensive Metabolic Panel',
@@ -25,8 +26,9 @@ export default function LabsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [resultsModal, setResultsModal] = useState<string | null>(null);
-  const [form, setForm] = useState<Partial<LabResult>>({ status: 'ordered', priority: 'routine', category: '' });
+  const [form, setForm] = useState<Partial<LabResult>>({ status: 'ordered', priority: 'routine', category: '', attachments: [] });
   const [resultItems, setResultItems] = useState<LabResultItem[]>([]);
+  const [resultsAttachments, setResultsAttachments] = useState<AttachedDocument[]>([]);
 
   const activePatients = patients.filter((p) => !['discharged', 'transferred'].includes(p.status));
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
@@ -38,6 +40,7 @@ export default function LabsPage() {
       category: LAB_CATEGORIES[0],
       orderedDate: new Date().toISOString(),
       orderedBy: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : '',
+      attachments: [],
     });
     setEditingId(null);
     setShowModal(true);
@@ -64,12 +67,17 @@ export default function LabsPage() {
 
   function saveResults() {
     if (!resultsModal || !selectedPatientId) return;
+    const existing = selectedPatient?.labResults.find((l) => l.id === resultsModal);
+    const mergedAttachments = [...(existing?.attachments || []), ...resultsAttachments]
+      .filter((a, i, arr) => arr.findIndex((x) => x.id === a.id) === i);
     updateLabResult(selectedPatientId, resultsModal, {
       results: resultItems,
       status: 'resulted',
       resultDate: new Date().toISOString(),
+      attachments: mergedAttachments,
     });
     setResultsModal(null);
+    setResultsAttachments([]);
     addNotification({ type: 'success', title: 'Lab results saved' });
   }
 
@@ -122,10 +130,16 @@ export default function LabsPage() {
                         {lab.status}
                       </span>
                       <button onClick={() => { setForm(lab); setEditingId(lab.id); setShowModal(true); }} className="text-blue-600 hover:text-blue-700"><Edit size={15} /></button>
+                      {lab.attachments && lab.attachments.length > 0 && (
+                        <span className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full" title="Attached documents">
+                          <Paperclip size={12} /> {lab.attachments.length}
+                        </span>
+                      )}
                       {lab.status !== 'resulted' && (
                         <button
                           onClick={() => {
                             setResultItems(lab.results || [{ name: '', value: '', unit: '', referenceRange: '' }]);
+                            setResultsAttachments([]);
                             setResultsModal(lab.id);
                           }}
                           className="text-xs text-green-600 font-medium hover:text-green-700"
@@ -135,6 +149,38 @@ export default function LabsPage() {
                       )}
                     </div>
                   </div>
+                  {/* Attached documents */}
+                  {lab.attachments && lab.attachments.length > 0 && (
+                    <div className="mt-3 border-t pt-2">
+                      <p className="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                        <Paperclip size={12} /> Attached Documents ({lab.attachments.length})
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                        {lab.attachments.map((a) => (
+                          <a
+                            key={a.id}
+                            href={a.dataUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 p-2 border border-gray-200 rounded hover:border-blue-400 hover:bg-blue-50 transition-colors text-xs"
+                          >
+                            {a.mimeType.startsWith('image/') ? (
+                              <img src={a.dataUrl} alt={a.filename} className="w-8 h-8 object-cover rounded flex-shrink-0" />
+                            ) : (
+                              <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
+                                {a.mimeType === 'application/pdf' ? <FileText size={14} className="text-red-600" /> : <ImageIcon size={14} className="text-gray-500" />}
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-gray-900 truncate">{a.filename}</p>
+                              <p className="text-[10px] text-gray-500">{(a.sizeBytes / 1024).toFixed(0)} KB · by {a.uploadedBy}</p>
+                            </div>
+                            <Download size={12} className="text-gray-400 flex-shrink-0" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {lab.results && lab.results.length > 0 && (
                     <table className="w-full text-xs mt-2 border-t pt-2">
                       <thead><tr className="bg-gray-50">
@@ -203,6 +249,15 @@ export default function LabsPage() {
             <label className="label">Notes</label>
             <textarea value={form.notes || ''} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="textarea-field" rows={2} />
           </div>
+
+          <div className="border-t pt-3">
+            <DocumentUpload
+              attachments={form.attachments || []}
+              onChange={(att) => setForm({ ...form, attachments: att })}
+              label="Attach lab report / requisition / external results"
+            />
+          </div>
+
           <div className="flex gap-3 justify-end">
             <button onClick={() => setShowModal(false)} className="btn-secondary"><X size={16} />Cancel</button>
             <button onClick={saveOrder} className="btn-primary"><Save size={16} />Save</button>
@@ -234,6 +289,15 @@ export default function LabsPage() {
           <button onClick={() => setResultItems([...resultItems, { name: '', value: '', unit: '', referenceRange: '' }])} className="btn-secondary mt-3 text-sm">
             <Plus size={14} /> Add Row
           </button>
+
+          <div className="mt-4 border-t pt-3">
+            <DocumentUpload
+              attachments={resultsAttachments}
+              onChange={setResultsAttachments}
+              label="Upload result PDF / scan / external report"
+            />
+          </div>
+
           <div className="flex gap-3 justify-end mt-4">
             <button onClick={() => setResultsModal(null)} className="btn-secondary"><X size={16} />Cancel</button>
             <button onClick={saveResults} className="btn-primary"><Save size={16} />Save Results</button>

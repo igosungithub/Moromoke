@@ -1,11 +1,76 @@
 import { useState } from 'react';
-import { Settings, Hospital, User, Bell, Shield, Save, Key, Eye, EyeOff, Sparkles, Globe } from 'lucide-react';
+import { Settings, Hospital, User, Bell, Shield, Save, Key, Eye, EyeOff, Sparkles, Globe, KeyRound, UserCog } from 'lucide-react';
 import { useStaffStore } from '../store/staffStore';
 import { useUIStore } from '../store/uiStore';
+import { validatePasswordStrength } from '../utils/auth';
+import { ROLE_LABELS } from '../utils/permissions';
 
 export default function SettingsPage() {
-  const { currentUser, staff, setCurrentUser } = useStaffStore();
+  const { currentUser, staff, changePassword, resetPassword, setUsername } = useStaffStore();
   const { addNotification } = useUIStore();
+
+  // Password change state
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [pwLoading, setPwLoading] = useState(false);
+
+  // Admin: reset another user's password
+  const [resetTarget, setResetTarget] = useState<string>('');
+  const [resetPw, setResetPw] = useState('');
+  const [usernameTarget, setUsernameTarget] = useState<string>('');
+  const [newUsername, setNewUsername] = useState('');
+
+  const isAdmin = currentUser?.role === 'admin';
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!currentUser) return;
+    if (pwForm.next !== pwForm.confirm) {
+      addNotification({ type: 'error', title: 'Passwords do not match' });
+      return;
+    }
+    const check = validatePasswordStrength(pwForm.next);
+    if (!check.valid) {
+      addNotification({ type: 'error', title: 'Password too weak', message: check.reason });
+      return;
+    }
+    setPwLoading(true);
+    try {
+      const res = await changePassword(currentUser.id, pwForm.current, pwForm.next);
+      if (!res.ok) {
+        addNotification({ type: 'error', title: 'Could not change password', message: res.reason });
+        return;
+      }
+      setPwForm({ current: '', next: '', confirm: '' });
+      addNotification({ type: 'success', title: 'Password updated', message: 'Use your new password next time you sign in.' });
+    } finally {
+      setPwLoading(false);
+    }
+  }
+
+  async function handleAdminReset() {
+    if (!resetTarget || !resetPw) return;
+    const check = validatePasswordStrength(resetPw);
+    if (!check.valid) {
+      addNotification({ type: 'error', title: 'Password too weak', message: check.reason });
+      return;
+    }
+    await resetPassword(resetTarget, resetPw);
+    addNotification({ type: 'success', title: 'Password reset', message: 'User will be required to change it on next login.' });
+    setResetTarget('');
+    setResetPw('');
+  }
+
+  function handleSetUsername() {
+    if (!usernameTarget || !newUsername) return;
+    const res = setUsername(usernameTarget, newUsername);
+    if (!res.ok) {
+      addNotification({ type: 'error', title: 'Could not set username', message: res.reason });
+      return;
+    }
+    addNotification({ type: 'success', title: 'Username updated' });
+    setUsernameTarget('');
+    setNewUsername('');
+  }
 
   const [hospitalName, setHospitalName] = useState('Moromoke General Hospital');
   const [hospitalAddress, setHospitalAddress] = useState('1 Hospital Road, Lagos, Nigeria');
@@ -75,7 +140,7 @@ export default function SettingsPage() {
       {/* Active User */}
       <div className="card">
         <h2 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b flex items-center gap-2">
-          <User size={18} className="text-green-600" /> Active User Profile
+          <User size={18} className="text-green-600" /> My Account
         </h2>
         {currentUser ? (
           <div className="space-y-4">
@@ -83,33 +148,101 @@ export default function SettingsPage() {
               <div className="w-14 h-14 bg-blue-500 rounded-full flex items-center justify-center text-white text-xl font-bold">
                 {currentUser.firstName[0]}{currentUser.lastName[0]}
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="font-semibold text-gray-900 text-lg">{currentUser.firstName} {currentUser.lastName}</p>
-                <p className="text-sm text-gray-600 capitalize">{currentUser.role} · {currentUser.department}</p>
+                <p className="text-sm text-gray-600 capitalize">{ROLE_LABELS[currentUser.role]} · {currentUser.department}</p>
                 <p className="text-xs text-gray-500">{currentUser.email}</p>
+                <p className="text-xs text-gray-400 mt-1 font-mono">@{currentUser.username} · ID: {currentUser.employeeId}</p>
               </div>
             </div>
-            <div>
-              <label className="label">Switch Active User</label>
-              <select
-                value={currentUser.id}
-                onChange={(e) => {
-                  const s = staff.find((st) => st.id === e.target.value);
-                  if (s) { setCurrentUser(s); addNotification({ type: 'success', title: `Switched to ${s.firstName} ${s.lastName}` }); }
-                }}
-                className="select-field max-w-xs"
-              >
-                {staff.map((s) => (
-                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName} — {s.role}</option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">Change the active user for demonstrations and testing.</p>
-            </div>
+
+            {currentUser.lastLoginAt && (
+              <p className="text-xs text-gray-500">
+                Last sign-in: {new Date(currentUser.lastLoginAt).toLocaleString()}
+              </p>
+            )}
           </div>
         ) : (
           <p className="text-gray-500">No user logged in.</p>
         )}
       </div>
+
+      {/* Change Password */}
+      {currentUser && (
+        <div className="card">
+          <h2 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b flex items-center gap-2">
+            <KeyRound size={18} className="text-amber-600" /> Change My Password
+          </h2>
+          <form onSubmit={handleChangePassword} className="space-y-3 max-w-md">
+            <div>
+              <label className="label">Current Password</label>
+              <input type="password" value={pwForm.current} onChange={(e) => setPwForm({ ...pwForm, current: e.target.value })} className="input-field" autoComplete="current-password" required />
+            </div>
+            <div>
+              <label className="label">New Password</label>
+              <input type="password" value={pwForm.next} onChange={(e) => setPwForm({ ...pwForm, next: e.target.value })} className="input-field" minLength={8} autoComplete="new-password" required />
+              <p className="text-xs text-gray-500 mt-1">At least 8 characters with a letter and a number.</p>
+            </div>
+            <div>
+              <label className="label">Confirm New Password</label>
+              <input type="password" value={pwForm.confirm} onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })} className="input-field" autoComplete="new-password" required />
+            </div>
+            <button type="submit" disabled={pwLoading} className="btn-primary"><Save size={16} />Update Password</button>
+          </form>
+        </div>
+      )}
+
+      {/* Admin: user management */}
+      {isAdmin && (
+        <div className="card">
+          <h2 className="text-base font-semibold text-gray-900 mb-1 pb-2 border-b flex items-center gap-2">
+            <UserCog size={18} className="text-red-600" /> Admin · User Management
+          </h2>
+          <p className="text-xs text-gray-500 mb-4">Reset passwords and set usernames for any staff member. Visible to admins only.</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Reset password */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-800 mb-2 flex items-center gap-1.5"><KeyRound size={14} /> Reset User Password</h3>
+              <select value={resetTarget} onChange={(e) => setResetTarget(e.target.value)} className="select-field mb-2">
+                <option value="">— Select staff —</option>
+                {staff.map((s) => <option key={s.id} value={s.id}>{s.firstName} {s.lastName} (@{s.username})</option>)}
+              </select>
+              <input
+                type="text"
+                value={resetPw}
+                onChange={(e) => setResetPw(e.target.value)}
+                placeholder="New temporary password"
+                className="input-field mb-2"
+              />
+              <button onClick={handleAdminReset} disabled={!resetTarget || !resetPw} className="btn-secondary text-sm">
+                Reset Password
+              </button>
+              <p className="text-xs text-gray-500 mt-2">User will be required to change it on next login.</p>
+            </div>
+
+            {/* Set username */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-800 mb-2 flex items-center gap-1.5"><User size={14} /> Set Username</h3>
+              <select value={usernameTarget} onChange={(e) => setUsernameTarget(e.target.value)} className="select-field mb-2">
+                <option value="">— Select staff —</option>
+                {staff.map((s) => <option key={s.id} value={s.id}>{s.firstName} {s.lastName} (@{s.username})</option>)}
+              </select>
+              <input
+                type="text"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                placeholder="New username"
+                className="input-field mb-2"
+              />
+              <button onClick={handleSetUsername} disabled={!usernameTarget || !newUsername} className="btn-secondary text-sm">
+                Update Username
+              </button>
+              <p className="text-xs text-gray-500 mt-2">3–32 characters: letters, numbers, . _ -</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* API Keys & Integrations */}
       <div className="card">
