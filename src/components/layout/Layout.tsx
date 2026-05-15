@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import NotificationToast from '../ui/NotificationToast';
+import IdleTimeoutBanner from './IdleTimeoutBanner';
 
 const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
@@ -10,10 +11,14 @@ const pageTitles: Record<string, string> = {
   '/triage': 'Triage Assessment',
   '/vitals': 'Vitals',
   '/medications': 'Medications',
+  '/drug-stock': 'Drug & Medication Stock',
   '/labs': 'Lab Results',
   '/imaging': 'Imaging',
+  '/maternity': 'Maternity & Paediatric Care',
   '/staff': 'Staff Management',
   '/reports': 'Reports & Analytics',
+  '/audit': 'Audit Log',
+  '/help': 'Help & Quick Start',
   '/settings': 'Settings',
 };
 
@@ -33,6 +38,7 @@ export default function Layout() {
         </main>
       </div>
       <NotificationToast />
+      <IdleTimeoutBanner />
     </div>
   );
 }

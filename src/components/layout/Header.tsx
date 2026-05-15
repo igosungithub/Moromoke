@@ -1,8 +1,9 @@
-import { Bell, Search, Clock } from 'lucide-react';
+import { Search, Clock } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePatientStore } from '../../store/patientStore';
 import { getPatientFullName, calculateAge } from '../../utils/helpers';
+import NotificationBell from './NotificationBell';
 
 export default function Header({ title }: { title: string }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,10 +83,7 @@ export default function Header({ title }: { title: string }) {
         </div>
 
         {/* Notifications */}
-        <button className="relative p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-          <Bell size={20} />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-        </button>
+        <NotificationBell />
       </div>
     </header>
   );

@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Pill, Plus, Edit, Trash2, Save, X, ArrowLeft } from 'lucide-react';
+import { Pill, Plus, Edit, Trash2, Save, X, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { usePatientStore } from '../store/patientStore';
 import { useStaffStore } from '../store/staffStore';
 import { useUIStore } from '../store/uiStore';
+import { useAlertsStore } from '../store/alertsStore';
 import { getPatientFullName, calculateAge, formatDate, STATUS_LABELS } from '../utils/helpers';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { PermissionGate } from '../components/ui/PermissionGate';
 import { usePermissions } from '../hooks/usePermissions';
+import { checkPrescriptionSafety } from '../utils/medicationSafety';
 import type { Medication } from '../types';
 
 export default function MedicationsPage() {
@@ -28,14 +30,22 @@ export default function MedicationsPage() {
     route: 'Oral',
     frequency: 'Once daily',
   });
+  const [overrideReason, setOverrideReason] = useState('');
 
   const activePatients = patients.filter((p) => !['discharged', 'transferred'].includes(p.status));
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
+
+  // Real-time safety check: allergies, interactions, duplicates
+  const safetyIssues = useMemo(() => {
+    return checkPrescriptionSafety(selectedPatient, { name: form.name, genericName: form.genericName, route: form.route }, editingId ?? undefined);
+  }, [selectedPatient, form.name, form.genericName, form.route, editingId]);
+  const hasCritical = safetyIssues.some((i) => i.severity === 'critical');
 
   function openAdd() {
     if (!can('medications:prescribe')) return;
     setForm({ status: 'active', route: 'Oral', frequency: 'Once daily', startDate: new Date().toISOString().split('T')[0], prescribedBy: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : '' });
     setEditingId(null);
+    setOverrideReason('');
     setShowModal(true);
   }
 
@@ -43,14 +53,26 @@ export default function MedicationsPage() {
     if (!can('medications:edit')) return;
     setForm(med);
     setEditingId(med.id);
+    setOverrideReason('');
     setShowModal(true);
   }
 
   function saveMedication() {
     if (!form.name || !form.dosage || !selectedPatientId) return;
+    // Critical safety issues require an override reason
+    if (hasCritical && !overrideReason.trim()) {
+      addNotification({
+        type: 'error', title: 'Override reason required',
+        message: 'A critical safety issue is flagged. Document why you are proceeding before saving.',
+      });
+      return;
+    }
     if (editingId) {
       if (!can('medications:edit')) return;
-      updateMedication(selectedPatientId, editingId, form);
+      updateMedication(selectedPatientId, editingId, {
+        ...form,
+        notes: overrideReason ? `${form.notes ? form.notes + '\n' : ''}SAFETY OVERRIDE: ${overrideReason}` : form.notes,
+      });
     } else {
       if (!can('medications:prescribe')) return;
       addMedication(selectedPatientId, {
@@ -63,7 +85,19 @@ export default function MedicationsPage() {
         prescribedBy: form.prescribedBy || '',
         status: form.status || 'active',
         indication: form.indication || '',
+        notes: overrideReason ? `${form.notes ? form.notes + '\n' : ''}SAFETY OVERRIDE: ${overrideReason}` : form.notes,
       });
+      // Raise a persistent alert if a critical issue was overridden
+      if (hasCritical && selectedPatient) {
+        useAlertsStore.getState().push({
+          category: 'medication', severity: 'critical', source: 'manual',
+          title: `Safety override — ${form.name} for ${selectedPatient.firstName} ${selectedPatient.lastName}`,
+          message: `Prescribed despite ${safetyIssues.filter((i) => i.severity === 'critical').length} critical issue(s). Reason: ${overrideReason}`,
+          link: `/medications?patientId=${selectedPatient.id}`,
+          patientId: selectedPatient.id,
+          visibleToRoles: ['admin', 'pharmacist'],
+        });
+      }
     }
     setShowModal(false);
     addNotification({ type: 'success', title: editingId ? 'Medication updated' : 'Medication added' });
@@ -169,6 +203,40 @@ export default function MedicationsPage() {
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingId ? 'Edit Medication' : 'Add Medication'} size="lg">
         <div className="p-6 space-y-4">
+
+          {/* Safety check panel */}
+          {safetyIssues.length > 0 && (
+            <div className={`rounded-lg border-2 p-3 ${hasCritical ? 'border-red-400 bg-red-50' : 'border-orange-300 bg-orange-50'}`}>
+              <div className={`flex items-center gap-2 font-semibold mb-2 text-sm ${hasCritical ? 'text-red-800' : 'text-orange-800'}`}>
+                <AlertTriangle size={16} />
+                Safety Check — {safetyIssues.length} issue{safetyIssues.length === 1 ? '' : 's'} detected
+              </div>
+              <ul className="space-y-2">
+                {safetyIssues.map((i, idx) => (
+                  <li key={idx} className={`text-xs ${i.severity === 'critical' ? 'text-red-800' : 'text-orange-800'}`}>
+                    <p className="font-semibold">{i.severity === 'critical' ? '⛔ ' : '⚠ '}{i.title}</p>
+                    <p className="mt-0.5 leading-relaxed">{i.detail}</p>
+                  </li>
+                ))}
+              </ul>
+              {hasCritical && (
+                <div className="mt-3 pt-3 border-t border-red-300">
+                  <label className="text-xs font-semibold text-red-800 mb-1 block">
+                    Override reason (required to proceed) *
+                  </label>
+                  <textarea
+                    value={overrideReason}
+                    onChange={(e) => setOverrideReason(e.target.value)}
+                    className="w-full text-xs px-2 py-1.5 border border-red-300 rounded bg-white text-gray-900"
+                    rows={2}
+                    placeholder="e.g., Penicillin reaction was mild rash 20 years ago, benefit outweighs risk; senior consultant approval obtained."
+                  />
+                  <p className="text-[10px] text-red-700 mt-1">This will be logged in the audit trail and visible to admin + pharmacist.</p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="label">Medication Name *</label>
