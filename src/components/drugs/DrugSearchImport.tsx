@@ -39,6 +39,19 @@ export default function DrugSearchImport() {
   const [error, setError] = useState<string | null>(null);
   const [sourceFilter, setSourceFilter] = useState<'all' | DrugCatalogResult['source']>('all');
 
+  const [offlineCount, setOfflineCount] = useState<number | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { loadOfflineCatalog } = await import('../../services/offlineDrugCatalog');
+        const idx = await loadOfflineCatalog();
+        setOfflineCount(idx?.count ?? null);
+      } catch {
+        setOfflineCount(null);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     if (!query || query.length < 3) {
       setSuggestions([]);
@@ -79,6 +92,39 @@ export default function DrugSearchImport() {
     setLoadingDetail(true);
     setLabelData(null);
     try {
+      // Offline catalog results carry id 'offline-<key>'. Try local partition first.
+      if (d.id.startsWith('offline-')) {
+        const { loadOfflineCatalog, loadDetail } = await import('../../services/offlineDrugCatalog');
+        const idx = await loadOfflineCatalog();
+        const key = d.id.replace(/^offline-/, '');
+        const entry = idx?.entries.find((e) => e.key === key);
+        if (entry) {
+          const detail = await loadDetail(entry);
+          if (detail) {
+            setLabelData({
+              id: `offline-${key}`,
+              set_id: detail.ndc ?? key,
+              openfda: {
+                generic_name: entry.generic ? [entry.generic] : undefined,
+                brand_name: entry.brands?.length ? entry.brands : undefined,
+                manufacturer_name: detail.manufacturer ? [detail.manufacturer] : undefined,
+                product_ndc: entry.ndc ? [entry.ndc] : undefined,
+                route: entry.route ? [entry.route] : undefined,
+                rxcui: entry.rxcui ? [entry.rxcui] : undefined,
+              },
+              dosage_and_administration: detail.dosage ? [detail.dosage] : undefined,
+              indications_and_usage: detail.indications ? [detail.indications] : undefined,
+              contraindications: detail.contraindications ? [detail.contraindications] : undefined,
+              warnings: detail.warnings ? [detail.warnings] : undefined,
+              adverse_reactions: detail.adverseReactions ? [detail.adverseReactions] : undefined,
+              drug_interactions: detail.drugInteractions ? [detail.drugInteractions] : undefined,
+              storage_and_handling: detail.storage ? [detail.storage] : undefined,
+            } as unknown as FdaDrugResult);
+            return;
+          }
+        }
+      }
+      // Live OpenFDA fallback
       const label = await fetchOpenFdaLabel(d.genericName || d.brandName || d.name);
       setLabelData(label);
     } catch {
@@ -118,10 +164,14 @@ export default function DrugSearchImport() {
           <div className="text-sm">
             <p className="font-semibold text-blue-900 mb-1">Authoritative drug catalog search</p>
             <p className="text-blue-800">
-              Search RxNorm/RxCUIs, FDA NDC products, and DailyMed SPL labels. Imported records keep their source IDs so pharmacists can trace safety information.
+              {offlineCount !== null ? (
+                <>Searching <strong>{offlineCount.toLocaleString()}</strong> drugs from the offline catalog (OpenFDA NDC + labels). Falls back to live RxNorm / FDA / DailyMed only when offline data is missing.</>
+              ) : (
+                <>Live search via RxNorm/RxCUIs, FDA NDC, DailyMed SPL. To enable offline search, run <code className="bg-blue-100 px-1 py-0.5 rounded">npm run download:drug-catalogs -- --include-large-files</code> then <code className="bg-blue-100 px-1 py-0.5 rounded">node scripts/normalize-drug-catalogs.mjs</code>.</>
+              )}
             </p>
             <p className="text-xs text-blue-700 mt-1">
-              NHS dm+d should be loaded from licensed NHS/TRUD release files. Odoo should be connected as your hospital ERP/product master, not treated as a public medicines dictionary.
+              NHS dm+d requires NHS/TRUD-licensed release files; Odoo should be connected as your hospital ERP product master.
             </p>
           </div>
         </div>

@@ -258,6 +258,31 @@ export async function searchAdverseEvents(drugName: string): Promise<{ term: str
 }
 
 export async function searchAllDrugSources(query: string): Promise<DrugCatalogResult[]> {
+  // Offline-first: if a normalised catalog has been built locally
+  // (scripts/normalize-drug-catalogs.mjs), use it. The local index covers
+  // ~42k drugs from OpenFDA NDC + labels without any network round-trip.
+  // Fall back to live RxNorm / FDA / DailyMed only when the catalog is
+  // missing or returns no matches.
+  try {
+    const { searchOfflineCatalog } = await import('./offlineDrugCatalog');
+    const offline = await searchOfflineCatalog(query, 50);
+    if (offline.length > 0) {
+      return offline.map((e): DrugCatalogResult => ({
+        id: `offline-${e.key}`,
+        source: e.source.includes('openfda-ndc') ? 'fda_ndc' : 'rxnorm',
+        name: e.name,
+        genericName: e.generic || e.name,
+        brandName: e.brands[0],
+        rxcui: e.rxcui,
+        ndcProductCode: e.ndc,
+        route: e.route ? [e.route] : undefined,
+        dosageForm: e.dosageForm,
+      }));
+    }
+  } catch {
+    // catalog not built yet — silently fall through to network search
+  }
+
   const [rxnorm, ndc, dailymed] = await Promise.all([
     searchRxNorm(query),
     searchFdaNdc(query),
