@@ -188,22 +188,26 @@ export const ROLE_PERMISSIONS: RolePermissions = {
     'settings:view',
   ],
 
-  // ADMINISTRATOR — operational/HR access. NO clinical authority but can
-  // see everything for oversight (audit log, reports, staff management).
+  // ADMINISTRATOR — full system access (operational AND clinical).
+  // Per project requirement: admin has 100% access to everything so a single
+  // super-user can perform any action when needed. Real hospitals usually
+  // keep admin clinical-read-only — if you re-enable that separation later,
+  // replace this with a curated list like the other roles.
   admin: [
     'patient:view', 'patient:create', 'patient:edit', 'patient:delete',
-    'notes:view',
-    'triage:view',
-    'vitals:view',
-    'medications:view',
-    'drugstock:view', 'drugstock:create', 'drugstock:edit',
-    'labs:view',
-    'imaging:view',
+    'notes:view', 'notes:create', 'notes:edit_own', 'notes:edit_any', 'notes:sign',
+    'triage:view', 'triage:create', 'triage:edit',
+    'vitals:view', 'vitals:create',
+    'medications:view', 'medications:prescribe', 'medications:administer',
+    'medications:edit', 'medications:delete', 'medications:verify',
+    'drugstock:view', 'drugstock:create', 'drugstock:edit', 'drugstock:delete', 'drugstock:dispense',
+    'labs:view', 'labs:order', 'labs:enter_results', 'labs:edit', 'labs:upload_document',
+    'imaging:view', 'imaging:order', 'imaging:report', 'imaging:edit', 'imaging:upload_document',
     'staff:view', 'staff:create', 'staff:edit', 'staff:delete',
     'staff:assign_roles', 'staff:reset_password',
-    'diagnosis:view',
-    'encounter:view',
-    'maternity:view',
+    'diagnosis:view', 'diagnosis:create', 'diagnosis:edit',
+    'encounter:view', 'encounter:manage', 'discharge:manage',
+    'maternity:view', 'maternity:create', 'maternity:edit',
     'reports:view',
     'settings:view', 'settings:edit',
     'audit:view',
@@ -259,5 +263,5 @@ export const ROLE_ACCESS_DESCRIPTIONS: Record<StaffRole, string> = {
   pharmacist: 'Pharmacy access — drug stock management, dispensing, medication verification. View-only on clinical records.',
   radiologist: 'Reads and reports imaging studies. View-only on other clinical records. Does NOT order imaging.',
   technician: 'Records vitals, enters lab results, uploads imaging files. No clinical interpretation or prescribing.',
-  admin: 'Administrative oversight — staff management, role assignment, password resets, audit log, reports. No clinical editing authority.',
+  admin: 'Full system access — every permission in the system. Can perform any clinical, operational, or administrative action.',
 };

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
   Package, Plus, Search, AlertTriangle, ChevronDown, ChevronUp,
-  Edit, Trash2, Save, X, ArrowUpCircle, BarChart2, FlaskConical, Info, Globe
+  Edit, Trash2, Save, X, ArrowUpCircle, BarChart2, FlaskConical, Info, Globe, Library
 } from 'lucide-react';
 import { useDrugStore } from '../store/drugStore';
 import { useStaffStore } from '../store/staffStore';
@@ -10,6 +10,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import DrugSearchImport from '../components/drugs/DrugSearchImport';
+import BrowseCatalog from '../components/drugs/BrowseCatalog';
 import type { DrugStockItem, DrugCategory, RouteOfAdministration, DrugFormulation, ControlledStatus } from '../types/drugStock';
 
 const CATEGORY_LABELS: Record<DrugCategory, string> = {
@@ -65,7 +66,7 @@ export default function DrugStockPage() {
   const { currentUser } = useStaffStore();
   const { can } = usePermissions();
 
-  const [tab, setTab] = useState<'inventory' | 'search' | 'add'>('inventory');
+  const [tab, setTab] = useState<'inventory' | 'browse' | 'search' | 'add'>('inventory');
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<DrugCategory | 'all'>('all');
   const [lowStockOnly, setLowStockOnly] = useState(false);
@@ -290,6 +291,7 @@ export default function DrugStockPage() {
       <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
         {[
           { id: 'inventory', label: 'Inventory', icon: Package },
+          { id: 'browse', label: 'Browse Catalog (42k)', icon: Library },
           { id: 'search', label: 'Search & Import Sources', icon: Globe },
           { id: 'add', label: 'Add Manually', icon: Plus },
         ].filter((item) => item.id !== 'add' || can('drugstock:create')).map(({ id, label, icon: Icon }) => (
@@ -304,6 +306,9 @@ export default function DrugStockPage() {
           </button>
         ))}
       </div>
+
+      {/* Browse Catalog tab content */}
+      {tab === 'browse' && <BrowseCatalog />}
 
       {/* Search tab content */}
       {tab === 'search' && <DrugSearchImport />}

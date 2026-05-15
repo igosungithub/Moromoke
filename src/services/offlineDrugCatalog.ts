@@ -80,6 +80,20 @@ export async function loadOfflineCatalog(): Promise<OfflineCatalogIndex | null> 
   return indexLoadPromise;
 }
 
+// Browse the whole catalog with pagination (no search query needed).
+export async function browseOfflineCatalog(page: number, pageSize = 50): Promise<{ entries: OfflineCatalogEntry[]; total: number }> {
+  const idx = await loadOfflineCatalog();
+  if (!idx) return { entries: [], total: 0 };
+  const start = (Math.max(1, page) - 1) * pageSize;
+  return { entries: idx.entries.slice(start, start + pageSize), total: idx.entries.length };
+}
+
+// Lookup a single entry by stable key (used for bulk-import workflows).
+export async function getOfflineEntryByKey(key: string): Promise<OfflineCatalogEntry | null> {
+  const idx = await loadOfflineCatalog();
+  return idx?.entries.find((e) => e.key === key) ?? null;
+}
+
 export async function searchOfflineCatalog(query: string, limit = 30): Promise<OfflineCatalogEntry[]> {
   const idx = await loadOfflineCatalog();
   if (!idx) return [];
