@@ -127,6 +127,51 @@ export const useStaffStore = create<StaffStore>()(
     }),
     {
       name: 'moromoke-staff',
+      version: 2,
+      // v1 -> v2: add username/passwordHash to any staff lacking them, ensure
+      // admin account exists, and force re-login (clear currentUser/auth flag).
+      migrate: (persistedState: unknown, fromVersion: number) => {
+        const state = (persistedState ?? {}) as { staff?: Staff[] };
+        if (fromVersion < 2) {
+          const existing = state.staff ?? [];
+          const used = new Set(
+            existing.map((s) => s.username?.toLowerCase()).filter(Boolean) as string[]
+          );
+          const migrated = existing.map((s) => {
+            if (s.username && s.passwordHash) return s;
+            let base = ((s.firstName || 'user') + '.' + (s.lastName || ''))
+              .toLowerCase().replace(/[^a-z0-9._-]/g, '').replace(/\.+/g, '.').slice(0, 32) || 'user';
+            let candidate = base;
+            let i = 1;
+            while (used.has(candidate)) { candidate = `${base}${i++}`; }
+            used.add(candidate);
+            return {
+              ...s,
+              username: s.username || candidate,
+              passwordHash: s.passwordHash || DEFAULT_PASSWORD_HASH,
+              mustChangePassword: s.mustChangePassword ?? true,
+            };
+          });
+          // Ensure admin account is present
+          if (!migrated.find((s) => s.username?.toLowerCase() === 'admin')) {
+            const seedAdmin = sampleStaff.find((s) => s.username === 'admin');
+            if (seedAdmin) migrated.push(seedAdmin);
+          }
+          // Also ensure all seed accounts exist (idempotent — won't duplicate by id or username)
+          for (const seed of sampleStaff) {
+            if (!migrated.find((s) => s.id === seed.id || s.username?.toLowerCase() === seed.username.toLowerCase())) {
+              migrated.push(seed);
+            }
+          }
+          return {
+            ...state,
+            staff: migrated,
+            currentUser: null,
+            isAuthenticated: false,
+          };
+        }
+        return state;
+      },
     }
   )
 );
