@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Settings, Hospital, User, Bell, Shield, Save } from 'lucide-react';
+import { Settings, Hospital, User, Bell, Shield, Save, Key, Eye, EyeOff, Sparkles, Globe } from 'lucide-react';
 import { useStaffStore } from '../store/staffStore';
 import { useUIStore } from '../store/uiStore';
 
@@ -13,8 +13,22 @@ export default function SettingsPage() {
   const [hospitalEmail, setHospitalEmail] = useState('info@moromoke.hospital');
   const [maxBeds, setMaxBeds] = useState('20');
 
+  // API Keys & integrations
+  const [anthropicKey, setAnthropicKey] = useState(() => localStorage.getItem('moromoke_anthropic_key') || '');
+  const [showKey, setShowKey] = useState(false);
+  const [odooUrl, setOdooUrl] = useState(() => localStorage.getItem('moromoke_odoo_url') || '');
+  const [odooDb, setOdooDb] = useState(() => localStorage.getItem('moromoke_odoo_db') || '');
+
   function saveHospitalSettings() {
     addNotification({ type: 'success', title: 'Hospital settings saved' });
+  }
+
+  function saveApiKeys() {
+    if (anthropicKey) localStorage.setItem('moromoke_anthropic_key', anthropicKey);
+    else localStorage.removeItem('moromoke_anthropic_key');
+    if (odooUrl) localStorage.setItem('moromoke_odoo_url', odooUrl);
+    if (odooDb) localStorage.setItem('moromoke_odoo_db', odooDb);
+    addNotification({ type: 'success', title: 'API keys & integrations saved', message: 'Stored locally in browser only.' });
   }
 
   return (
@@ -95,6 +109,99 @@ export default function SettingsPage() {
         ) : (
           <p className="text-gray-500">No user logged in.</p>
         )}
+      </div>
+
+      {/* API Keys & Integrations */}
+      <div className="card">
+        <h2 className="text-base font-semibold text-gray-900 mb-4 pb-2 border-b flex items-center gap-2">
+          <Key size={18} className="text-purple-600" /> API Keys & Integrations
+        </h2>
+
+        {/* Anthropic */}
+        <div className="space-y-4">
+          <div>
+            <label className="label flex items-center gap-2">
+              <Sparkles size={14} className="text-purple-600" />
+              Anthropic API Key (for AI Clinical Decision Support)
+            </label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  value={anthropicKey}
+                  onChange={(e) => setAnthropicKey(e.target.value)}
+                  className="input-field pr-10"
+                  placeholder="sk-ant-api03-..."
+                />
+                <button
+                  onClick={() => setShowKey(!showKey)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  type="button"
+                >
+                  {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Powers the AI Clinical Assistant in the Triage workflow. Uses Claude Haiku 4.5 model.
+              Get your key from{' '}
+              <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                console.anthropic.com
+              </a>. Key is stored locally in your browser only — never sent to any server other than Anthropic's API.
+            </p>
+            {anthropicKey && !anthropicKey.startsWith('sk-ant-') && (
+              <p className="text-xs text-amber-700 mt-1">⚠ Key format looks incorrect. Anthropic keys start with "sk-ant-".</p>
+            )}
+          </div>
+
+          {/* Drug data sources info */}
+          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm">
+            <p className="font-medium text-blue-900 mb-1 flex items-center gap-2">
+              <Globe size={14} /> Drug Database Sources (No API key required)
+            </p>
+            <ul className="text-xs text-blue-800 space-y-0.5 ml-5 list-disc">
+              <li><strong>RxNorm</strong> (NIH/NLM) — 100,000+ drugs, brand & generic names, drug interactions</li>
+              <li><strong>OpenFDA</strong> — Full FDA drug label data: dosing, contraindications, side effects</li>
+              <li><strong>NHS / NICE pathways</strong> — Triage protocols built into the app (no external call)</li>
+            </ul>
+            <p className="text-xs text-blue-700 mt-2">All free, open-access, no registration needed. Direct browser-to-API calls.</p>
+          </div>
+
+          {/* Odoo integration (optional) */}
+          <details className="border border-gray-200 rounded-lg">
+            <summary className="p-3 cursor-pointer text-sm font-medium text-gray-700 hover:bg-gray-50">
+              Optional: Odoo Inventory Sync (Advanced)
+            </summary>
+            <div className="p-3 border-t border-gray-200 space-y-3">
+              <div>
+                <label className="label">Odoo Server URL</label>
+                <input
+                  value={odooUrl}
+                  onChange={(e) => setOdooUrl(e.target.value)}
+                  className="input-field"
+                  placeholder="https://your-odoo-instance.com"
+                />
+              </div>
+              <div>
+                <label className="label">Odoo Database Name</label>
+                <input
+                  value={odooDb}
+                  onChange={(e) => setOdooDb(e.target.value)}
+                  className="input-field"
+                  placeholder="my_hospital_db"
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                Note: Odoo XML-RPC requires CORS configuration on the Odoo server side. For production use, configure a backend proxy.
+                For now, use the RxNorm/OpenFDA search tab in Drug Stock for ready-to-import drug data.
+              </p>
+            </div>
+          </details>
+
+          <button onClick={saveApiKeys} className="btn-primary">
+            <Save size={16} /> Save API Keys
+          </button>
+        </div>
       </div>
 
       {/* Notifications */}

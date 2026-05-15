@@ -2,16 +2,17 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, CheckCircle, Activity, Pill, FlaskConical, ArrowRight,
-  ChevronDown, ChevronUp, Phone, MapPin, Save, ArrowLeft, Info, Stethoscope
+  ChevronDown, ChevronUp, Phone, MapPin, Save, ArrowLeft, Info, Stethoscope, Sparkles, Loader2
 } from 'lucide-react';
 import { usePatientStore } from '../store/patientStore';
 import { useStaffStore } from '../store/staffStore';
 import { useUIStore } from '../store/uiStore';
 import {
-  TRIAGE_PROTOCOLS, COMPLAINT_OPTIONS, type ChiefComplaint, type TriageProtocol
+  ALL_TRIAGE_PROTOCOLS, COMPLAINT_CATEGORIES, type TriageProtocol
 } from '../utils/triageProtocols';
 import { getPatientFullName } from '../utils/helpers';
 import { PermissionGate } from '../components/ui/PermissionGate';
+import { getClinicalSuggestions, type ClinicalAiResponse } from '../services/clinicalAi';
 
 const ESI_CONFIG = {
   1: { color: 'bg-red-600 text-white', border: 'border-red-400', label: 'Level 1 — Resuscitation', description: 'Immediate life-threatening — resuscitate NOW' },
@@ -34,7 +35,7 @@ export default function TriagePage() {
 
   const [step, setStep] = useState<Step>(preselectedId ? 'select-complaint' : 'select-patient');
   const [selectedPatientId, setSelectedPatientId] = useState(preselectedId || '');
-  const [_selectedComplaint, setSelectedComplaint] = useState<ChiefComplaint | null>(null);
+  const [_selectedComplaint, setSelectedComplaint] = useState<string | null>(null);
   const [protocol, setProtocol] = useState<TriageProtocol | null>(null);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [redFlagsPresent, setRedFlagsPresent] = useState<Record<number, boolean>>({});
@@ -42,9 +43,15 @@ export default function TriagePage() {
   const [vitals, setVitals] = useState({ bp: '', hr: '', rr: '', temp: '', spo2: '', glucose: '', pain: 5 });
   const [notes, setNotes] = useState('');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    redFlags: true, steps: true, drugs: true, investigations: false, referrals: false,
+    redFlags: true, steps: true, drugs: true, investigations: false, referrals: false, ai: true,
   });
   const [patientSearch, setPatientSearch] = useState('');
+  const [complaintSearch, setComplaintSearch] = useState('');
+
+  // AI Clinical Assistant state
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResponse, setAiResponse] = useState<ClinicalAiResponse | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
   const detectedRedFlagCount = Object.values(redFlagsPresent).filter(Boolean).length;
@@ -58,12 +65,51 @@ export default function TriagePage() {
     }
   }, [redFlagsPresent, protocol, detectedRedFlagCount]);
 
-  function handleSelectComplaint(c: ChiefComplaint) {
+  function handleSelectComplaint(c: string) {
     setSelectedComplaint(c);
-    setProtocol(TRIAGE_PROTOCOLS[c]);
+    setProtocol(ALL_TRIAGE_PROTOCOLS[c]);
     setAnswers({});
     setRedFlagsPresent({});
+    setAiResponse(null);
+    setAiError(null);
     setStep('assessment');
+  }
+
+  async function runAiAssistant() {
+    if (!protocol) return;
+    const apiKey = localStorage.getItem('moromoke_anthropic_key') || '';
+    if (!apiKey) {
+      setAiError('No Anthropic API key configured. Add one in Settings → API Keys to enable AI suggestions.');
+      return;
+    }
+    setAiLoading(true);
+    setAiError(null);
+    setAiResponse(null);
+    try {
+      const patientAnswers = protocol.questions
+        .map((q, i) => answers[i] ? `Q: ${q}\nA: ${answers[i]}` : null)
+        .filter(Boolean).join('\n\n');
+      const vitalSigns = [
+        vitals.bp && `BP ${vitals.bp}`, vitals.hr && `HR ${vitals.hr}`,
+        vitals.rr && `RR ${vitals.rr}`, vitals.temp && `Temp ${vitals.temp}`,
+        vitals.spo2 && `SpO2 ${vitals.spo2}`, vitals.glucose && `Glucose ${vitals.glucose}`,
+        `Pain ${vitals.pain}/10`,
+      ].filter(Boolean).join(', ');
+      const res = await getClinicalSuggestions(apiKey, {
+        chiefComplaint: protocol.label,
+        patientAnswers: patientAnswers || '(No answers recorded yet)',
+        vitalSigns,
+        patientAge: selectedPatient?.dateOfBirth
+          ? Math.floor((Date.now() - new Date(selectedPatient.dateOfBirth).getTime()) / (365.25 * 86400000))
+          : undefined,
+        knownAllergies: selectedPatient?.allergies?.map((a) => a.allergen).join(', '),
+      });
+      setAiResponse(res);
+    } catch (e) {
+      setAiError(`AI request failed: ${(e as Error).message}`);
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   function toggleSection(key: string) {
@@ -178,17 +224,36 @@ export default function TriagePage() {
               <span>Patient: <strong>{getPatientFullName(selectedPatient)}</strong> · MRN: {selectedPatient.mrn}</span>
             </div>
           )}
-          <h2 className="font-semibold text-gray-900 mb-4">What is the chief complaint / presenting problem?</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-            {COMPLAINT_OPTIONS.map(({ value, label }) => (
-              <button
-                key={value}
-                onClick={() => handleSelectComplaint(value as ChiefComplaint)}
-                className="text-left p-4 border-2 border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 transition-all"
-              >
-                <span className="font-medium text-gray-900">{label}</span>
-              </button>
-            ))}
+          <h2 className="font-semibold text-gray-900 mb-2">What is the chief complaint / presenting problem?</h2>
+          <p className="text-xs text-gray-500 mb-4">{Object.keys(ALL_TRIAGE_PROTOCOLS).length} NHS-pathway-aligned presentations across 14 body systems.</p>
+          <input
+            value={complaintSearch}
+            onChange={(e) => setComplaintSearch(e.target.value)}
+            placeholder="Search presenting problem (e.g., chest pain, rash, jaundice)..."
+            className="input-field mb-4"
+            autoFocus
+          />
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+            {COMPLAINT_CATEGORIES.map((cat) => {
+              const opts = cat.options.filter((o) => !complaintSearch || o.label.toLowerCase().includes(complaintSearch.toLowerCase()));
+              if (opts.length === 0) return null;
+              return (
+                <div key={cat.label}>
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">{cat.label}</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {opts.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        onClick={() => handleSelectComplaint(value)}
+                        className="text-left p-3 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all text-sm"
+                      >
+                        <span className="font-medium text-gray-900">{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <button onClick={() => setStep('select-patient')} className="btn-secondary mt-4"><ArrowLeft size={16} />Back</button>
         </div>
@@ -438,6 +503,80 @@ export default function TriagePage() {
             </CollapsibleSection>
           )}
 
+          {/* AI Clinical Assistant */}
+          <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl border-2 border-purple-200 overflow-hidden">
+            <button onClick={() => toggleSection('ai')} className="flex w-full items-center justify-between p-4 font-semibold text-purple-900 hover:bg-purple-100/50">
+              <span className="flex items-center gap-2">
+                <Sparkles size={16} className="text-purple-600" /> AI Clinical Decision Support
+                <span className="text-xs px-2 py-0.5 bg-purple-200 text-purple-800 rounded-full font-normal">Claude Haiku 4.5</span>
+              </span>
+              {expandedSections.ai ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            {expandedSections.ai && (
+              <div className="px-4 pb-4 space-y-3">
+                <p className="text-xs text-purple-700">
+                  Real-time AI clinical suggestions based on patient answers, vitals, and chief complaint. Follows NHS / NICE guidelines.
+                  <strong> All AI suggestions require clinician review before action.</strong>
+                </p>
+
+                {!aiResponse && !aiLoading && (
+                  <button onClick={runAiAssistant} className="btn-primary bg-purple-600 hover:bg-purple-700 border-purple-600">
+                    <Sparkles size={16} /> Get AI Clinical Suggestions
+                  </button>
+                )}
+
+                {aiLoading && (
+                  <div className="flex items-center gap-2 text-purple-700 text-sm py-3">
+                    <Loader2 size={16} className="animate-spin" /> Analysing patient data with Claude…
+                  </div>
+                )}
+
+                {aiError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+                    {aiError}
+                  </div>
+                )}
+
+                {aiResponse && (
+                  <div className="space-y-3 text-sm">
+                    <div className={`p-3 rounded-lg font-medium ${
+                      aiResponse.urgency === 'immediate' ? 'bg-red-100 text-red-800 border border-red-300' :
+                      aiResponse.urgency === 'urgent' ? 'bg-orange-100 text-orange-800 border border-orange-300' :
+                      'bg-green-100 text-green-800 border border-green-300'
+                    }`}>
+                      AI Assessed Urgency: <span className="uppercase">{aiResponse.urgency}</span>
+                    </div>
+
+                    <AiSection title="Differential Diagnoses" items={aiResponse.differentials} color="blue" />
+                    <AiSection title="Red Flags to Watch" items={aiResponse.redFlags} color="red" />
+                    <AiSection title="Suggested Investigations" items={aiResponse.investigations} color="purple" />
+
+                    {aiResponse.medications.length > 0 && (
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-gray-600 mb-1">Suggested Medications</p>
+                        <div className="space-y-1">
+                          {aiResponse.medications.map((m, i) => (
+                            <div key={i} className="p-2 bg-white rounded border border-purple-200">
+                              <p className="font-semibold text-purple-900 text-xs">{m.name} — <span className="font-normal text-gray-700">{m.dose}</span></p>
+                              <p className="text-xs text-gray-500">{m.indication}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <AiSection title="Referrals" items={aiResponse.referrals} color="orange" />
+                    <AiSection title="Clinical Pearls" items={aiResponse.clinicalPearls} color="green" />
+
+                    <button onClick={runAiAssistant} className="text-xs text-purple-700 underline hover:text-purple-900">
+                      Re-run AI suggestions
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Disposition */}
           <div className="card p-4">
             <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
@@ -472,6 +611,27 @@ interface CollapsibleSectionProps {
   expanded: boolean;
   onToggle: () => void;
   children: React.ReactNode;
+}
+
+function AiSection({ title, items, color }: { title: string; items: string[]; color: 'blue' | 'red' | 'purple' | 'orange' | 'green' }) {
+  if (!items?.length) return null;
+  const cls = {
+    blue: 'bg-blue-50 text-blue-800 border-blue-200',
+    red: 'bg-red-50 text-red-800 border-red-200',
+    purple: 'bg-purple-50 text-purple-800 border-purple-200',
+    orange: 'bg-orange-50 text-orange-800 border-orange-200',
+    green: 'bg-green-50 text-green-800 border-green-200',
+  }[color];
+  return (
+    <div>
+      <p className="text-xs font-bold uppercase tracking-wide text-gray-600 mb-1">{title}</p>
+      <div className="flex flex-wrap gap-1">
+        {items.map((item, i) => (
+          <span key={i} className={`text-xs px-2 py-1 rounded-full border ${cls}`}>{item}</span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function CollapsibleSection({ title, icon, expanded, onToggle, children }: CollapsibleSectionProps) {

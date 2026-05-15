@@ -887,7 +887,137 @@ export const TRIAGE_PROTOCOLS: Record<ChiefComplaint, TriageProtocol> = {
   },
 };
 
-export const COMPLAINT_OPTIONS = Object.values(TRIAGE_PROTOCOLS).map((p) => ({
-  value: p.complaint,
-  label: p.label,
-}));
+import { TRIAGE_PROTOCOLS_EXTENDED, type ExtendedChiefComplaint } from './triageProtocolsExtended';
+
+export type AllChiefComplaint = ChiefComplaint | ExtendedChiefComplaint;
+
+// Merged registry of all triage protocols (core + extended)
+export const ALL_TRIAGE_PROTOCOLS: Record<string, TriageProtocol> = {
+  ...TRIAGE_PROTOCOLS,
+  ...TRIAGE_PROTOCOLS_EXTENDED,
+};
+
+// Categorised options for the picker
+export const COMPLAINT_CATEGORIES: { label: string; options: { value: string; label: string }[] }[] = [
+  {
+    label: 'Critical / Emergency',
+    options: [
+      { value: 'cardiac_arrest', label: 'Cardiac Arrest' }, { value: 'anaphylaxis', label: 'Anaphylaxis' },
+      { value: 'stroke_symptoms', label: 'Stroke Symptoms' }, { value: 'sepsis', label: 'Sepsis' },
+      { value: 'trauma_injury', label: 'Major Trauma' }, { value: 'overdose_poisoning', label: 'Overdose / Poisoning' },
+    ],
+  },
+  {
+    label: 'Cardiovascular',
+    options: [
+      { value: 'chest_pain', label: 'Chest Pain' }, { value: 'palpitations', label: 'Palpitations / Arrhythmia' },
+      { value: 'syncope', label: 'Syncope / Collapse' }, { value: 'hypertensive_emergency', label: 'Hypertensive Emergency' },
+      { value: 'heart_failure_decomp', label: 'Decompensated Heart Failure' }, { value: 'dvt_suspected', label: 'Suspected DVT' },
+    ],
+  },
+  {
+    label: 'Respiratory',
+    options: [
+      { value: 'shortness_of_breath', label: 'Shortness of Breath' }, { value: 'acute_asthma_exacerbation', label: 'Acute Asthma' },
+      { value: 'haemoptysis', label: 'Haemoptysis' }, { value: 'pneumothorax', label: 'Pneumothorax' },
+      { value: 'croup', label: 'Croup (Paediatric)' },
+    ],
+  },
+  {
+    label: 'Neurological',
+    options: [
+      { value: 'headache', label: 'Headache' }, { value: 'headache_thunderclap', label: 'Thunderclap Headache' },
+      { value: 'seizure', label: 'Seizure' }, { value: 'focal_weakness', label: 'Focal Weakness' },
+      { value: 'dizziness_vertigo', label: 'Dizziness / Vertigo' }, { value: 'acute_confusion_delirium', label: 'Acute Confusion / Delirium' },
+      { value: 'meningitis_suspected', label: 'Suspected Meningitis' },
+    ],
+  },
+  {
+    label: 'Gastrointestinal',
+    options: [
+      { value: 'abdominal_pain', label: 'Abdominal Pain' }, { value: 'nausea_vomiting', label: 'Nausea & Vomiting' },
+      { value: 'diarrhoea', label: 'Diarrhoea' }, { value: 'constipation', label: 'Constipation' },
+      { value: 'upper_gi_bleed', label: 'Upper GI Bleed' }, { value: 'lower_gi_bleed', label: 'Lower GI Bleed' },
+      { value: 'jaundice', label: 'Jaundice' }, { value: 'dysphagia', label: 'Dysphagia' },
+      { value: 'bowel_obstruction', label: 'Bowel Obstruction' }, { value: 'pancreatitis', label: 'Pancreatitis' },
+    ],
+  },
+  {
+    label: 'Genitourinary',
+    options: [
+      { value: 'uti', label: 'UTI' }, { value: 'renal_colic', label: 'Renal Colic' },
+      { value: 'urinary_retention', label: 'Urinary Retention' }, { value: 'haematuria', label: 'Haematuria' },
+      { value: 'acute_kidney_injury', label: 'Acute Kidney Injury' }, { value: 'testicular_pain', label: 'Acute Testicular Pain' },
+    ],
+  },
+  {
+    label: 'Musculoskeletal & Skin',
+    options: [
+      { value: 'back_pain', label: 'Back Pain' }, { value: 'joint_swelling', label: 'Joint Swelling' },
+      { value: 'limb_fracture', label: 'Limb Fracture' }, { value: 'soft_tissue_injury', label: 'Soft Tissue Injury' },
+      { value: 'rash_urticaria', label: 'Rash / Urticaria' }, { value: 'cellulitis', label: 'Cellulitis' },
+      { value: 'burns_scalds', label: 'Burns / Scalds' },
+    ],
+  },
+  {
+    label: 'ENT & Eyes',
+    options: [
+      { value: 'ear_pain', label: 'Ear Pain' }, { value: 'sore_throat', label: 'Sore Throat' },
+      { value: 'epistaxis', label: 'Epistaxis' }, { value: 'dental_pain', label: 'Dental Pain' },
+      { value: 'red_eye', label: 'Red Eye' }, { value: 'visual_loss', label: 'Sudden Visual Loss' },
+      { value: 'eye_injury', label: 'Eye Injury' },
+    ],
+  },
+  {
+    label: 'Obstetric & Gynaecology',
+    options: [
+      { value: 'obstetric', label: 'Obstetric Emergency' }, { value: 'ectopic_pregnancy_suspected', label: 'Suspected Ectopic' },
+      { value: 'hyperemesis_gravidarum', label: 'Hyperemesis Gravidarum' }, { value: 'vaginal_bleeding_non_pregnant', label: 'Vaginal Bleeding' },
+      { value: 'pelvic_pain', label: 'Pelvic Pain' },
+    ],
+  },
+  {
+    label: 'Paediatric',
+    options: [
+      { value: 'paediatric_fever', label: 'Paediatric Fever' }, { value: 'paediatric_wheeze', label: 'Paediatric Wheeze' },
+      { value: 'febrile_seizure', label: 'Febrile Seizure' }, { value: 'neonatal_jaundice', label: 'Neonatal Jaundice' },
+      { value: 'paediatric_head_injury', label: 'Paediatric Head Injury' },
+    ],
+  },
+  {
+    label: 'Endocrine & Metabolic',
+    options: [
+      { value: 'diabetic_emergency', label: 'Diabetic Emergency' }, { value: 'hypoglycaemia', label: 'Hypoglycaemia' },
+      { value: 'thyroid_storm', label: 'Thyroid Storm' }, { value: 'adrenal_crisis', label: 'Adrenal Crisis' },
+    ],
+  },
+  {
+    label: 'Haematology / Oncology',
+    options: [
+      { value: 'sickle_cell_crisis', label: 'Sickle Cell Crisis' }, { value: 'neutropenic_sepsis', label: 'Neutropenic Sepsis' },
+      { value: 'anaemia_symptomatic', label: 'Symptomatic Anaemia' },
+    ],
+  },
+  {
+    label: 'Psychiatric',
+    options: [
+      { value: 'mental_health', label: 'Mental Health Crisis' }, { value: 'acute_psychosis', label: 'Acute Psychosis' },
+      { value: 'alcohol_withdrawal', label: 'Alcohol Withdrawal' }, { value: 'self_harm', label: 'Self-harm' },
+      { value: 'panic_attack', label: 'Panic Attack' },
+    ],
+  },
+  {
+    label: 'Infectious & Toxicology',
+    options: [
+      { value: 'fever', label: 'Fever (Adult)' }, { value: 'malaria_suspected', label: 'Suspected Malaria' },
+      { value: 'carbon_monoxide', label: 'Carbon Monoxide Poisoning' }, { value: 'snake_bite', label: 'Snake Bite' },
+      { value: 'electrical_injury', label: 'Electrical Injury' },
+    ],
+  },
+  {
+    label: 'Other',
+    options: [{ value: 'other', label: 'Other / General' }],
+  },
+];
+
+export const COMPLAINT_OPTIONS = COMPLAINT_CATEGORIES.flatMap((c) => c.options);

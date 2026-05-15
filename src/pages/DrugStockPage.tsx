@@ -1,13 +1,14 @@
 import { useState, useMemo } from 'react';
 import {
   Package, Plus, Search, AlertTriangle, ChevronDown, ChevronUp,
-  Edit, Trash2, Save, X, ArrowUpCircle, BarChart2, FlaskConical, Info
+  Edit, Trash2, Save, X, ArrowUpCircle, BarChart2, FlaskConical, Info, Globe
 } from 'lucide-react';
 import { useDrugStore } from '../store/drugStore';
 import { useStaffStore } from '../store/staffStore';
 import { PermissionGate } from '../components/ui/PermissionGate';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import DrugSearchImport from '../components/drugs/DrugSearchImport';
 import type { DrugStockItem, DrugCategory, RouteOfAdministration, DrugFormulation, ControlledStatus } from '../types/drugStock';
 
 const CATEGORY_LABELS: Record<DrugCategory, string> = {
@@ -59,6 +60,7 @@ export default function DrugStockPage() {
   const { drugs, addDrug, updateDrug, deleteDrug, restockDrug } = useDrugStore();
   const { currentUser } = useStaffStore();
 
+  const [tab, setTab] = useState<'inventory' | 'search' | 'add'>('inventory');
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<DrugCategory | 'all'>('all');
   const [lowStockOnly, setLowStockOnly] = useState(false);
@@ -272,12 +274,40 @@ export default function DrugStockPage() {
           <h1 className="text-xl font-bold text-gray-900">Drug & Medication Stock</h1>
           <p className="text-sm text-gray-500">{drugs.filter((d) => d.isActive).length} drugs · {lowStockCount} low stock · {expiringCount} expiring soon</p>
         </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+        {[
+          { id: 'inventory', label: 'Inventory', icon: Package },
+          { id: 'search', label: 'Search & Import (RxNorm/OpenFDA)', icon: Globe },
+          { id: 'add', label: 'Add Manually', icon: Plus },
+        ].map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => { if (id === 'add') { setTab('inventory'); openAdd(); } else setTab(id as typeof tab); }}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
+              tab === id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <Icon size={14} /> {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Search tab content */}
+      {tab === 'search' && <DrugSearchImport />}
+
+      {/* Inventory tab content — wrap existing UI */}
+      {tab === 'inventory' && (
+       <>
+       <div className="flex justify-end">
         <PermissionGate permission="drugstock:create">
           <button onClick={openAdd} className="btn-primary">
-            <Plus size={16} /> Add Drug
+            <Plus size={16} /> Add Drug Manually
           </button>
         </PermissionGate>
-      </div>
+       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -444,6 +474,8 @@ export default function DrugStockPage() {
           </div>
         ))}
       </div>
+       </>
+      )}
 
       {/* Add/Edit Modals */}
       <Modal isOpen={addModal} onClose={() => setAddModal(false)} title="Add New Drug" size="xl">
