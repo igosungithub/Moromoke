@@ -29,7 +29,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
     dosages: [
       { id: 'd1', indication: 'Pain / Fever', adultDose: '500mg–1g', paediatricDose: '10–15mg/kg', frequency: 'Every 4–6 hours', maxDailyDose: '4g/day', notes: 'Max 2g/day in hepatic impairment' }
     ],
-    quantityInStock: 2400, reorderLevel: 500, reorderQuantity: 1000, unitCost: 0.05, currency: 'GBP',
+    quantityInStock: 2400, reorderLevel: 500, reorderQuantity: 1000, unitCost: 0.05, currency: 'NGN',
     batchNumber: 'PCM-2024-01', expiryDate: '2026-12-31', manufacturer: 'GSK', supplier: 'NHS Supply Chain',
     contraindications: ['Hepatic impairment (severe)', 'Paracetamol allergy'],
     sideEffects: ['Hepatotoxicity (overdose)', 'Rash (rare)'],
@@ -45,7 +45,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
     dosages: [
       { id: 'd1', indication: 'Pain / Inflammation / Fever', adultDose: '400–600mg', paediatricDose: '5–10mg/kg', frequency: 'Every 6–8 hours with food', maxDailyDose: '2.4g/day', notes: 'Avoid in renal impairment, peptic ulcer, asthma' }
     ],
-    quantityInStock: 1200, reorderLevel: 300, reorderQuantity: 600, unitCost: 0.08, currency: 'GBP',
+    quantityInStock: 1200, reorderLevel: 300, reorderQuantity: 600, unitCost: 0.08, currency: 'NGN',
     batchNumber: 'IBU-2024-02', expiryDate: '2026-06-30', manufacturer: 'Reckitt', supplier: 'Alliance Healthcare',
     contraindications: ['Active peptic ulcer', 'Severe renal/hepatic impairment', 'Aspirin-sensitive asthma', 'Pregnancy ≥ 30 weeks'],
     sideEffects: ['GI upset', 'GI bleeding', 'Renal impairment', 'Fluid retention'],
@@ -62,7 +62,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
     dosages: [
       { id: 'd1', indication: 'Severe acute pain', adultDose: '2–10mg IV/IM/SC', paediatricDose: '0.05–0.2mg/kg IV/IM', frequency: 'Every 2–4 hours (titrate to effect)', maxDailyDose: 'Titrate to effect', renalAdjustment: 'Reduce dose in renal impairment', notes: 'Monitor respiratory rate, have naloxone available' }
     ],
-    quantityInStock: 48, reorderLevel: 20, reorderQuantity: 50, unitCost: 1.85, currency: 'GBP',
+    quantityInStock: 48, reorderLevel: 20, reorderQuantity: 50, unitCost: 1.85, currency: 'NGN',
     batchNumber: 'MORPH-2024-03', expiryDate: '2026-03-31', manufacturer: 'Hameln Pharma', supplier: 'AAH Pharmaceuticals',
     contraindications: ['Respiratory depression', 'Acute asthma attack', 'Head injury with raised ICP (use with caution)', 'MAOI use within 14 days'],
     sideEffects: ['Respiratory depression', 'Nausea/vomiting', 'Constipation', 'Sedation', 'Dependence'],
@@ -79,7 +79,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
       { id: 'd1', indication: 'Respiratory tract infections, UTI, skin infections', adultDose: '250–500mg', paediatricDose: '25–45mg/kg/day divided 8-hourly', frequency: 'Three times daily', duration: '5–7 days', renalAdjustment: 'Reduce frequency if eGFR < 30' },
       { id: 'd2', indication: 'Community-acquired pneumonia', adultDose: '500mg–1g', frequency: 'Three times daily', duration: '5–7 days' }
     ],
-    quantityInStock: 840, reorderLevel: 200, reorderQuantity: 500, unitCost: 0.12, currency: 'GBP',
+    quantityInStock: 840, reorderLevel: 200, reorderQuantity: 500, unitCost: 0.12, currency: 'NGN',
     batchNumber: 'AMOX-2024-04', expiryDate: '2025-12-31', manufacturer: 'Actavis', supplier: 'Phoenix',
     contraindications: ['Penicillin allergy', 'Mononucleosis (causes rash)'],
     sideEffects: ['Diarrhoea', 'Nausea', 'Rash', 'Anaphylaxis (rare)'],
@@ -95,7 +95,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
     dosages: [
       { id: 'd1', indication: 'Skin & soft tissue, respiratory, dental infections', adultDose: '625mg orally / 1.2g IV', paediatricDose: '30mg/kg/day (amoxicillin component)', frequency: 'Three times daily', duration: '5–7 days', notes: 'Take with food to reduce GI effects' }
     ],
-    quantityInStock: 420, reorderLevel: 100, reorderQuantity: 300, unitCost: 0.35, currency: 'GBP',
+    quantityInStock: 420, reorderLevel: 100, reorderQuantity: 300, unitCost: 0.35, currency: 'NGN',
     batchNumber: 'COAMOX-2024-05', expiryDate: '2025-09-30', manufacturer: 'GSK', supplier: 'Alliance',
     contraindications: ['Penicillin allergy', 'Previous co-amoxiclav-associated jaundice'],
     sideEffects: ['Diarrhoea', 'Cholestatic jaundice', 'Rash'],
@@ -112,7 +112,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
       { id: 'd1', indication: 'Anaerobic infections, C. diff, Trichomonas, Giardia', adultDose: '400mg (oral) / 500mg IV', paediatricDose: '7.5mg/kg', frequency: 'Three times daily', duration: '7 days', notes: 'Avoid alcohol. Take with food.' },
       { id: 'd2', indication: 'Bacterial vaginosis', adultDose: '400mg twice daily for 5 days', frequency: 'Twice daily' }
     ],
-    quantityInStock: 600, reorderLevel: 150, reorderQuantity: 400, unitCost: 0.10, currency: 'GBP',
+    quantityInStock: 600, reorderLevel: 150, reorderQuantity: 400, unitCost: 0.10, currency: 'NGN',
     batchNumber: 'METRO-2024-06', expiryDate: '2026-05-31', manufacturer: 'Wockhardt', supplier: 'Phoenix',
     contraindications: ['First trimester pregnancy (use with caution)', 'Alcohol consumption (disulfiram reaction)'],
     sideEffects: ['Nausea', 'Metallic taste', 'Peripheral neuropathy (prolonged use)', 'Seizures (high doses)'],
@@ -130,7 +130,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
       { id: 'd1', indication: 'UTI (complicated), respiratory, GI infections', adultDose: '250–750mg oral / 200–400mg IV', paediatricDose: 'Avoid unless no alternative (tendon damage risk)', frequency: 'Twice daily', duration: '5–14 days', notes: 'Avoid antacids 2h before/after. Adequate hydration.' },
       { id: 'd2', indication: 'Acute pyelonephritis', adultDose: '500mg twice daily', frequency: 'Twice daily', duration: '7 days' }
     ],
-    quantityInStock: 360, reorderLevel: 100, reorderQuantity: 250, unitCost: 0.22, currency: 'GBP',
+    quantityInStock: 360, reorderLevel: 100, reorderQuantity: 250, unitCost: 0.22, currency: 'NGN',
     batchNumber: 'CIPRO-2024-07', expiryDate: '2026-08-31', manufacturer: 'Bayer', supplier: 'AAH',
     contraindications: ['Fluoroquinolone hypersensitivity', 'Concurrent NSAID use (seizure risk)'],
     sideEffects: ['Tendinopathy/tendon rupture', 'GI disturbance', 'CNS effects', 'QT prolongation'],
@@ -146,7 +146,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
     dosages: [
       { id: 'd1', indication: 'Hypertension, angina, post-MI, arrhythmias', adultDose: '25–100mg', frequency: 'Once daily', maxDailyDose: '100mg', renalAdjustment: 'Reduce dose if eGFR < 35', notes: 'Do not stop abruptly' }
     ],
-    quantityInStock: 960, reorderLevel: 200, reorderQuantity: 500, unitCost: 0.07, currency: 'GBP',
+    quantityInStock: 960, reorderLevel: 200, reorderQuantity: 500, unitCost: 0.07, currency: 'NGN',
     batchNumber: 'ATEN-2024-08', expiryDate: '2026-11-30', manufacturer: 'AstraZeneca', supplier: 'Phoenix',
     contraindications: ['Asthma/COPD', 'Bradycardia', 'Heart block (2nd/3rd degree)', 'Cardiogenic shock'],
     sideEffects: ['Bradycardia', 'Fatigue', 'Cold extremities', 'Bronchospasm'],
@@ -162,7 +162,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
     dosages: [
       { id: 'd1', indication: 'Hypertension, chronic stable angina', adultDose: '5–10mg', frequency: 'Once daily', maxDailyDose: '10mg', hepaticAdjustment: 'Start at 2.5mg in hepatic impairment' }
     ],
-    quantityInStock: 720, reorderLevel: 150, reorderQuantity: 400, unitCost: 0.09, currency: 'GBP',
+    quantityInStock: 720, reorderLevel: 150, reorderQuantity: 400, unitCost: 0.09, currency: 'NGN',
     batchNumber: 'AMLO-2024-09', expiryDate: '2027-01-31', manufacturer: 'Pfizer', supplier: 'Alliance',
     contraindications: ['Cardiogenic shock', 'Unstable angina (except vasospastic)'],
     sideEffects: ['Peripheral oedema', 'Headache', 'Flushing', 'Dizziness'],
@@ -178,7 +178,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
     dosages: [
       { id: 'd1', indication: 'Hypertension, heart failure, post-MI, nephroprotection', adultDose: '1.25–10mg', frequency: 'Once daily (or divided twice daily)', maxDailyDose: '10mg', renalAdjustment: 'Halve dose if eGFR 10–30. Avoid if eGFR < 10', notes: 'Monitor K+, creatinine, BP after initiation' }
     ],
-    quantityInStock: 840, reorderLevel: 200, reorderQuantity: 500, unitCost: 0.11, currency: 'GBP',
+    quantityInStock: 840, reorderLevel: 200, reorderQuantity: 500, unitCost: 0.11, currency: 'NGN',
     batchNumber: 'RAMI-2024-10', expiryDate: '2026-10-31', manufacturer: 'Sanofi', supplier: 'Phoenix',
     contraindications: ['Bilateral renal artery stenosis', 'Pregnancy', 'Hyperkalaemia', 'Angioedema (previous ACEi-related)'],
     sideEffects: ['Dry cough', 'Hyperkalaemia', 'First-dose hypotension', 'Renal impairment', 'Angioedema'],
@@ -194,7 +194,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
     dosages: [
       { id: 'd1', indication: 'Type 2 Diabetes Mellitus', adultDose: '500mg–1g', frequency: 'Twice or three times daily with meals', maxDailyDose: '3g/day', renalAdjustment: 'Reduce to 500mg BD if eGFR 30–45; Contraindicated if eGFR < 30', notes: 'Hold 48h before/after IV contrast media' }
     ],
-    quantityInStock: 1200, reorderLevel: 300, reorderQuantity: 600, unitCost: 0.06, currency: 'GBP',
+    quantityInStock: 1200, reorderLevel: 300, reorderQuantity: 600, unitCost: 0.06, currency: 'NGN',
     batchNumber: 'METF-2024-11', expiryDate: '2026-12-31', manufacturer: 'Merck', supplier: 'AAH',
     contraindications: ['eGFR < 30', 'Lactic acidosis risk', 'IV contrast (temporarily hold)'],
     sideEffects: ['GI upset (diarrhoea, nausea)', 'Vitamin B12 deficiency (long-term)', 'Lactic acidosis (rare)'],
@@ -212,7 +212,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
       { id: 'd1', indication: 'Diabetic ketoacidosis (DKA)', adultDose: '0.1 units/kg/hour IV infusion', frequency: 'Continuous IV infusion', notes: 'Fixed rate insulin infusion per DKA protocol. Monitor glucose hourly.' },
       { id: 'd2', indication: 'Type 1 / Type 2 DM (meal-time)', adultDose: '4–10 units SC', paediatricDose: '0.1–0.2 units/kg SC', frequency: '15–30 minutes before meals', notes: 'Dose varies — individualise' }
     ],
-    quantityInStock: 60, reorderLevel: 20, reorderQuantity: 40, unitCost: 7.48, currency: 'GBP',
+    quantityInStock: 60, reorderLevel: 20, reorderQuantity: 40, unitCost: 7.48, currency: 'NGN',
     batchNumber: 'INS-2024-12', expiryDate: '2025-08-31', manufacturer: 'Novo Nordisk', supplier: 'NHS Supply Chain',
     contraindications: ['Hypoglycaemia'],
     sideEffects: ['Hypoglycaemia', 'Lipodystrophy at injection site', 'Hypokalaemia'],
@@ -230,7 +230,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
       { id: 'd1', indication: 'Acute asthma / bronchospasm relief', adultDose: '2.5–5mg via nebuliser or 4–8 puffs MDI with spacer', paediatricDose: '2.5mg nebulised (< 5 years: 1.25mg)', frequency: 'Every 15–20 min in acute attack (titrate)', notes: 'Continuous nebulisation in life-threatening asthma' },
       { id: 'd2', indication: 'COPD exacerbation', adultDose: '2.5mg nebulised', frequency: 'Four times daily (or as required)' }
     ],
-    quantityInStock: 180, reorderLevel: 50, reorderQuantity: 120, unitCost: 1.50, currency: 'GBP',
+    quantityInStock: 180, reorderLevel: 50, reorderQuantity: 120, unitCost: 1.50, currency: 'NGN',
     batchNumber: 'SALB-2024-13', expiryDate: '2026-07-31', manufacturer: 'GSK', supplier: 'Phoenix',
     contraindications: ['Hypersensitivity to salbutamol'],
     sideEffects: ['Tachycardia', 'Tremor', 'Hypokalaemia (high doses)', 'Headache'],
@@ -248,7 +248,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
       { id: 'd2', indication: 'COPD exacerbation', adultDose: '30mg once daily', frequency: 'Once daily', duration: '5 days' },
       { id: 'd3', indication: 'Rheumatoid arthritis, inflammatory conditions', adultDose: '7.5–15mg', frequency: 'Once daily in the morning', notes: 'Taper dose — do not stop abruptly' }
     ],
-    quantityInStock: 480, reorderLevel: 100, reorderQuantity: 300, unitCost: 0.04, currency: 'GBP',
+    quantityInStock: 480, reorderLevel: 100, reorderQuantity: 300, unitCost: 0.04, currency: 'NGN',
     batchNumber: 'PRED-2024-14', expiryDate: '2026-09-30', manufacturer: 'RPH Pharmaceuticals', supplier: 'AAH',
     contraindications: ['Systemic infection without antibiotic cover', 'Live vaccines'],
     sideEffects: ['Hyperglycaemia', 'Osteoporosis (long-term)', 'Adrenal suppression', 'Weight gain', 'Peptic ulcer', 'Infection susceptibility'],
@@ -267,7 +267,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
       { id: 'd2', indication: 'Cardiac arrest (pulseless VT/VF, asystole, PEA)', adultDose: '1mg IV/IO', frequency: 'Every 3–5 minutes during CPR', notes: 'After 3rd shock in shockable rhythms' },
       { id: 'd3', indication: 'Severe croup (nebulised)', adultDose: '5mL of 1:1000 nebulised', paediatricDose: '0.5mL/kg of 1:1000 (max 5mL)', frequency: 'Single dose', notes: 'Temporary effect — admit for observation' }
     ],
-    quantityInStock: 80, reorderLevel: 30, reorderQuantity: 60, unitCost: 3.20, currency: 'GBP',
+    quantityInStock: 80, reorderLevel: 30, reorderQuantity: 60, unitCost: 3.20, currency: 'NGN',
     batchNumber: 'ADR-2024-15', expiryDate: '2025-12-31', manufacturer: 'Meda Pharma', supplier: 'NHS Supply Chain',
     contraindications: ['No absolute contraindications in life-threatening anaphylaxis or cardiac arrest'],
     sideEffects: ['Tachycardia', 'Hypertension', 'Anxiety', 'Arrhythmias', 'Pallor'],
@@ -283,7 +283,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
     dosages: [
       { id: 'd1', indication: 'AF, DVT/PE, mechanical heart valves', adultDose: 'Loading: 10mg day 1–2; maintenance: 3–9mg', frequency: 'Once daily at same time', notes: 'Monitor INR 2–3 (3–4 for mechanical valves). Requires regular INR monitoring.' }
     ],
-    quantityInStock: 540, reorderLevel: 100, reorderQuantity: 300, unitCost: 0.09, currency: 'GBP',
+    quantityInStock: 540, reorderLevel: 100, reorderQuantity: 300, unitCost: 0.09, currency: 'NGN',
     batchNumber: 'WARF-2024-16', expiryDate: '2026-04-30', manufacturer: 'Actavis', supplier: 'Phoenix',
     contraindications: ['Active bleeding', 'Pregnancy (especially 1st/3rd trimester)', 'Severe hypertension'],
     sideEffects: ['Bleeding', 'Skin necrosis (rare)', 'Alopecia'],
@@ -301,7 +301,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
       { id: 'd1', indication: 'Status epilepticus, acute seizures', adultDose: '4mg IV bolus', paediatricDose: '0.1mg/kg IV (max 4mg)', frequency: 'Repeat once after 10 minutes if seizures continue', notes: 'Monitor airway, breathing, circulation. Resuscitation equipment must be available.' },
       { id: 'd2', indication: 'Acute anxiety / sedation pre-procedure', adultDose: '1–2mg IV/IM', frequency: 'Single dose or PRN', notes: 'Titrate to effect' }
     ],
-    quantityInStock: 36, reorderLevel: 15, reorderQuantity: 30, unitCost: 2.10, currency: 'GBP',
+    quantityInStock: 36, reorderLevel: 15, reorderQuantity: 30, unitCost: 2.10, currency: 'NGN',
     batchNumber: 'LOR-2024-17', expiryDate: '2025-10-31', manufacturer: 'Pfizer', supplier: 'AAH',
     contraindications: ['Respiratory depression', 'Severe hepatic impairment', 'Myasthenia gravis', 'Acute narrow-angle glaucoma'],
     sideEffects: ['Respiratory depression', 'Sedation', 'Dependence (prolonged use)', 'Amnesia'],
@@ -317,7 +317,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
     dosages: [
       { id: 'd1', indication: 'Fluid resuscitation, volume replacement, IV drug dilution', adultDose: '500mL–1L IV bolus for shock; maintenance 1–2L/day', paediatricDose: '10–20mL/kg IV bolus for shock', frequency: 'As prescribed', notes: 'Monitor fluid balance, electrolytes' }
     ],
-    quantityInStock: 200, reorderLevel: 60, reorderQuantity: 100, unitCost: 0.88, currency: 'GBP',
+    quantityInStock: 200, reorderLevel: 60, reorderQuantity: 100, unitCost: 0.88, currency: 'NGN',
     batchNumber: 'NS-2024-18', expiryDate: '2027-06-30', manufacturer: 'Baxter', supplier: 'NHS Supply Chain',
     contraindications: ['Hypernatraemia (relative)', 'Fluid overload (use with caution)'],
     sideEffects: ['Hyperchloraemic acidosis (large volumes)', 'Fluid overload'],
@@ -335,7 +335,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
       { id: 'd1', indication: 'Induction / augmentation of labour', adultDose: '2–8 milliunits/min IV infusion (titrate)', frequency: 'Continuous infusion (titrate per protocol)', notes: 'Monitor contractions & fetal heart rate continuously' },
       { id: 'd2', indication: 'Prevention/management of postpartum haemorrhage', adultDose: '10 units IM immediately after delivery', frequency: 'Single IM dose (or IV infusion: 10–40 units in 500mL)' }
     ],
-    quantityInStock: 120, reorderLevel: 40, reorderQuantity: 80, unitCost: 2.50, currency: 'GBP',
+    quantityInStock: 120, reorderLevel: 40, reorderQuantity: 80, unitCost: 2.50, currency: 'NGN',
     batchNumber: 'OXY-2024-19', expiryDate: '2025-11-30', manufacturer: 'Novartis', supplier: 'NHS Supply Chain',
     contraindications: ['Cephalopelvic disproportion', 'Malpresentation', 'Previous classical caesarean section', 'Fetal distress before labour'],
     sideEffects: ['Uterine hyperstimulation', 'Fetal distress', 'Water retention (hyponatraemia)', 'Nausea', 'Hypotension (IV bolus)'],
@@ -352,7 +352,7 @@ const SAMPLE_DRUGS: DrugStockItem[] = [
     dosages: [
       { id: 'd1', indication: 'Opioid overdose reversal', adultDose: '400mcg–2mg IV/IM/SC; 1.8mg intranasal', paediatricDose: '10mcg/kg IV/IM (can repeat)', frequency: 'Every 2–3 minutes until response; may repeat', notes: 'Short-acting — repeated doses or infusion may be needed. Monitor for re-narcotisation.' }
     ],
-    quantityInStock: 60, reorderLevel: 20, reorderQuantity: 40, unitCost: 4.80, currency: 'GBP',
+    quantityInStock: 60, reorderLevel: 20, reorderQuantity: 40, unitCost: 4.80, currency: 'NGN',
     batchNumber: 'NALOX-2024-20', expiryDate: '2025-12-31', manufacturer: 'Pfizer', supplier: 'AAH',
     contraindications: ['Naloxone hypersensitivity'],
     sideEffects: ['Acute opioid withdrawal (agitation, tachycardia, hypertension, pulmonary oedema)', 'Nausea', 'Seizures (rare)'],

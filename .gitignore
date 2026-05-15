@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Generated drug catalog downloads can be very large.
+data/drug-catalogs/
+public/drug-catalogs/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

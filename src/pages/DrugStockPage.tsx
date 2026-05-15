@@ -47,12 +47,15 @@ const CONTROLLED_LABEL: Record<ControlledStatus, string> = {
   schedule_4: 'CD Sch.4', schedule_5: 'CD Sch.5',
 };
 
+const formatNaira = (value: number) =>
+  new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 2 }).format(value);
+
 type ViewMode = 'list' | 'detail';
 
 const emptyDrug = (): Omit<DrugStockItem, 'id' | 'createdAt' | 'updatedAt'> => ({
   name: '', genericName: '', brandNames: [], category: 'other', formulation: 'tablet',
   strength: '', unit: 'tablet', routes: ['oral'], dosages: [], quantityInStock: 0,
-  reorderLevel: 50, reorderQuantity: 100, unitCost: 0, currency: 'GBP', batchNumber: '',
+  reorderLevel: 50, reorderQuantity: 100, unitCost: 0, currency: 'NGN', batchNumber: '',
   expiryDate: '', manufacturer: '', controlledStatus: 'uncontrolled', requiresPrescription: true,
   contraindications: [], sideEffects: [], interactions: [], storageConditions: '', location: '', isActive: true,
 });
@@ -201,7 +204,7 @@ export default function DrugStockPage() {
           <input type="number" value={form.reorderLevel} onChange={(e) => setForm({ ...form, reorderLevel: +e.target.value })} className="input-field" />
         </div>
         <div>
-          <label className="label">Unit Cost (GBP)</label>
+          <label className="label">Unit Cost (NGN)</label>
           <input type="number" step="0.01" value={form.unitCost} onChange={(e) => setForm({ ...form, unitCost: +e.target.value })} className="input-field" />
         </div>
         <div>
@@ -322,7 +325,7 @@ export default function DrugStockPage() {
           { label: 'Total Drugs', value: drugs.filter((d) => d.isActive).length, icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
           { label: 'Low / Out of Stock', value: lowStockCount, icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-50' },
           { label: 'Expiring (< 90d)', value: expiringCount, icon: FlaskConical, color: 'text-red-600', bg: 'bg-red-50' },
-          { label: 'Inventory Value', value: `£${totalValue.toFixed(2)}`, icon: BarChart2, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Inventory Value', value: formatNaira(totalValue), icon: BarChart2, color: 'text-green-600', bg: 'bg-green-50' },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className={`rounded-xl p-4 ${bg}`}>
             <div className="flex items-center gap-2 mb-1">
