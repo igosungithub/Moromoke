@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, UserPlus, Filter } from 'lucide-react';
 import { usePatientStore } from '../store/patientStore';
 import { calculateAge, getPatientFullName, formatDate, STATUS_COLORS, STATUS_LABELS, ESI_COLORS } from '../utils/helpers';
+import { PermissionGate } from '../components/ui/PermissionGate';
 
 export default function PatientList() {
   const navigate = useNavigate();
@@ -43,10 +44,12 @@ export default function PatientList() {
             <option value="transferred">Transferred</option>
           </select>
         </div>
-        <button onClick={() => navigate('/patients/new')} className="btn-primary">
-          <UserPlus size={16} />
-          Register Patient
-        </button>
+        <PermissionGate permission="patient:create">
+          <button onClick={() => navigate('/patients/new')} className="btn-primary">
+            <UserPlus size={16} />
+            Register Patient
+          </button>
+        </PermissionGate>
       </div>
 
       <div className="card p-0 overflow-hidden">

@@ -7,6 +7,8 @@ import { useUIStore } from '../store/uiStore';
 import { getPatientFullName, calculateAge, formatDate, STATUS_LABELS } from '../utils/helpers';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { PermissionGate } from '../components/ui/PermissionGate';
+import { usePermissions } from '../hooks/usePermissions';
 import type { Medication } from '../types';
 
 export default function MedicationsPage() {
@@ -15,6 +17,7 @@ export default function MedicationsPage() {
   const { patients, addMedication, updateMedication, deleteMedication } = usePatientStore();
   const { currentUser } = useStaffStore();
   const { addNotification } = useUIStore();
+  const { can } = usePermissions();
 
   const [selectedPatientId, setSelectedPatientId] = useState(searchParams.get('patientId') || '');
   const [showModal, setShowModal] = useState(false);
@@ -30,12 +33,14 @@ export default function MedicationsPage() {
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
 
   function openAdd() {
+    if (!can('medications:prescribe')) return;
     setForm({ status: 'active', route: 'Oral', frequency: 'Once daily', startDate: new Date().toISOString().split('T')[0], prescribedBy: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : '' });
     setEditingId(null);
     setShowModal(true);
   }
 
   function openEdit(med: Medication) {
+    if (!can('medications:edit')) return;
     setForm(med);
     setEditingId(med.id);
     setShowModal(true);
@@ -44,8 +49,10 @@ export default function MedicationsPage() {
   function saveMedication() {
     if (!form.name || !form.dosage || !selectedPatientId) return;
     if (editingId) {
+      if (!can('medications:edit')) return;
       updateMedication(selectedPatientId, editingId, form);
     } else {
+      if (!can('medications:prescribe')) return;
       addMedication(selectedPatientId, {
         ...form,
         name: form.name!,
@@ -99,9 +106,11 @@ export default function MedicationsPage() {
               <h2 className="font-semibold text-gray-900">{getPatientFullName(selectedPatient)}</h2>
               <p className="text-xs text-gray-500">{selectedPatient.mrn} · {STATUS_LABELS[selectedPatient.status]}</p>
             </div>
-            <button onClick={openAdd} className="btn-primary">
-              <Plus size={16} /> Add Medication
-            </button>
+            <PermissionGate permission="medications:prescribe">
+              <button onClick={openAdd} className="btn-primary">
+                <Plus size={16} /> Add Medication
+              </button>
+            </PermissionGate>
           </div>
 
           {selectedPatient.currentMedications.length === 0 ? (
@@ -141,8 +150,12 @@ export default function MedicationsPage() {
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex gap-2">
-                          <button onClick={() => openEdit(med)} className="text-blue-600 hover:text-blue-700"><Edit size={15} /></button>
-                          <button onClick={() => setDeleteId(med.id)} className="text-red-500 hover:text-red-700"><Trash2 size={15} /></button>
+                          <PermissionGate permission="medications:edit">
+                            <button onClick={() => openEdit(med)} className="text-blue-600 hover:text-blue-700"><Edit size={15} /></button>
+                          </PermissionGate>
+                          <PermissionGate permission="medications:delete">
+                            <button onClick={() => setDeleteId(med.id)} className="text-red-500 hover:text-red-700"><Trash2 size={15} /></button>
+                          </PermissionGate>
                         </div>
                       </td>
                     </tr>
@@ -226,7 +239,7 @@ export default function MedicationsPage() {
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
         onConfirm={() => {
-          if (deleteId && selectedPatientId) {
+          if (deleteId && selectedPatientId && can('medications:delete')) {
             deleteMedication(selectedPatientId, deleteId);
             addNotification({ type: 'success', title: 'Medication removed' });
           }

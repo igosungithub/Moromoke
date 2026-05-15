@@ -7,6 +7,7 @@ import { usePatientStore } from '../store/patientStore';
 import { useStaffStore } from '../store/staffStore';
 import { useUIStore } from '../store/uiStore';
 import { getPatientFullName, calculateAge, calculateBMI } from '../utils/helpers';
+import { usePermissions } from '../hooks/usePermissions';
 
 const schema = z.object({
   patientId: z.string().min(1, 'Patient required'),
@@ -34,6 +35,7 @@ export default function VitalsPage() {
   const { patients, addVitals } = usePatientStore();
   const { currentUser } = useStaffStore();
   const { addNotification } = useUIStore();
+  const { can } = usePermissions();
 
   const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -56,6 +58,7 @@ export default function VitalsPage() {
   const activePatients = patients.filter((p) => !['discharged', 'transferred'].includes(p.status));
 
   function onSubmit(data: FormData) {
+    if (!can('vitals:create')) return;
     addVitals(data.patientId, {
       timestamp: new Date().toISOString(),
       recordedBy: currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Staff',
@@ -253,7 +256,7 @@ export default function VitalsPage() {
 
         <div className="flex gap-3 justify-end">
           <button type="button" onClick={() => navigate(-1)} className="btn-secondary">Cancel</button>
-          <button type="submit" disabled={isSubmitting} className="btn-primary">
+          <button type="submit" disabled={isSubmitting || !can('vitals:create')} className="btn-primary">
             <Save size={16} /> Save Vitals
           </button>
         </div>

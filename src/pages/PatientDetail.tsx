@@ -72,6 +72,7 @@ export default function PatientDetail() {
 
   function saveAllergy() {
     if (!allergyForm.allergen || !allergyForm.reaction || !allergyForm.severity || !patient) return;
+    if (!can('patient:edit')) return;
     if (editingAllergyId) {
       updateAllergy(patient.id, editingAllergyId, allergyForm);
     } else {
@@ -87,8 +88,12 @@ export default function PatientDetail() {
     if (!noteForm.title || !noteForm.type || !patient) return;
     const now = new Date().toISOString();
     if (editingNoteId) {
+      const existing = patient.clinicalNotes.find((note) => note.id === editingNoteId);
+      const canEditOwn = existing?.authorId === currentUser?.id && can('notes:edit_own');
+      if (!canEditOwn && !can('notes:edit_any')) return;
       updateClinicalNote(patient.id, editingNoteId, noteForm);
     } else {
+      if (!can('notes:create')) return;
       addClinicalNote(patient.id, {
         ...noteForm,
         patientId: patient.id,
@@ -107,6 +112,7 @@ export default function PatientDetail() {
 
   function saveDiagnosis() {
     if (!diagForm.code || !diagForm.description || !patient) return;
+    if (!can('diagnosis:create')) return;
     if (activeEncounter) {
       addDiagnosis(patient.id, activeEncounter.id, diagForm as Omit<Diagnosis, 'id'>);
       setDiagnosisModal(false);
@@ -117,6 +123,7 @@ export default function PatientDetail() {
 
   function signNote(noteId: string) {
     if (!patient) return;
+    if (!can('notes:sign')) return;
     updateClinicalNote(patient.id, noteId, {
       isSigned: true,
       signedAt: new Date().toISOString(),

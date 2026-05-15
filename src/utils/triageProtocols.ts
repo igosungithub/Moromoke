@@ -19,7 +19,7 @@ export type ChiefComplaint =
 export interface RedFlag {
   symptom: string;
   reason: string;
-  esiLevel: 1 | 2;
+  esiLevel: 1 | 2 | 3;
 }
 
 export interface ClinicalStep {

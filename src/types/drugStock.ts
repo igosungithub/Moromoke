@@ -75,6 +75,7 @@ export type DrugFormulation =
   | 'other';
 
 export type ControlledStatus = 'uncontrolled' | 'schedule_2' | 'schedule_3' | 'schedule_4' | 'schedule_5';
+export type DrugDataSource = 'manual' | 'rxnorm' | 'openfda_label' | 'fda_ndc' | 'dailymed' | 'nhs_dmd' | 'odoo';
 
 export interface DrugDosage {
   id: string;
@@ -114,6 +115,20 @@ export interface DrugStockItem {
   expiryDate: string;
   manufacturer: string;
   supplier?: string;
+  sourceMetadata?: {
+    sources: DrugDataSource[];
+    rxcui?: string;
+    ndcProductCode?: string;
+    ndcPackageCodes?: string[];
+    splSetId?: string;
+    splId?: string;
+    dmdVmpId?: string;
+    dmdAmpId?: string;
+    odooProductId?: string;
+    labelUrl?: string;
+    sourceUpdatedAt?: string;
+    importedAt: string;
+  };
 
   // Safety / regulatory
   controlledStatus: ControlledStatus;

@@ -6,6 +6,17 @@ import type {
 } from '../types';
 import { samplePatients } from '../utils/sampleData';
 import { generateId, generateMRN } from '../utils/helpers';
+import { logAudit } from './auditStore';
+
+// Internal helper used by audit log calls. Looks up patient name/MRN at the
+// time of the action so audit entries are self-contained.
+function patientContext(patients: Patient[], patientId: string) {
+  const p = patients.find((x) => x.id === patientId);
+  return {
+    patientId,
+    patientName: p ? `${p.firstName} ${p.lastName} (${p.mrn})` : patientId,
+  };
+}
 
 interface PatientStore {
   patients: Patient[];
@@ -74,20 +85,45 @@ export const usePatientStore = create<PatientStore>()(
           status: 'waiting',
         };
         set((state) => ({ patients: [...state.patients, newPatient] }));
+        logAudit({
+          category: 'patient', action: 'create',
+          description: `Registered new patient: ${newPatient.firstName} ${newPatient.lastName} (${newPatient.mrn})`,
+          resourceType: 'patient', resourceId: newPatient.id,
+          patientId: newPatient.id, patientName: `${newPatient.firstName} ${newPatient.lastName} (${newPatient.mrn})`,
+        });
         return newPatient;
       },
 
       updatePatient: (id, updates) => {
+        const before = get().patients.find((p) => p.id === id);
         set((state) => ({
           patients: state.patients.map((p) => p.id === id ? { ...p, ...updates } : p),
         }));
+        if (before) {
+          const fields = Object.keys(updates).slice(0, 8).join(', ');
+          logAudit({
+            category: 'patient', action: 'edit',
+            description: `Updated patient ${before.firstName} ${before.lastName} (${before.mrn}) — fields: ${fields}`,
+            resourceType: 'patient', resourceId: id,
+            patientId: id, patientName: `${before.firstName} ${before.lastName} (${before.mrn})`,
+          });
+        }
       },
 
       deletePatient: (id) => {
+        const removed = get().patients.find((p) => p.id === id);
         set((state) => ({
           patients: state.patients.filter((p) => p.id !== id),
           selectedPatientId: state.selectedPatientId === id ? null : state.selectedPatientId,
         }));
+        if (removed) {
+          logAudit({
+            category: 'patient', action: 'delete', severity: 'critical',
+            description: `Deleted patient: ${removed.firstName} ${removed.lastName} (${removed.mrn})`,
+            resourceType: 'patient', resourceId: id,
+            patientId: id, patientName: `${removed.firstName} ${removed.lastName} (${removed.mrn})`,
+          });
+        }
       },
 
       selectPatient: (id) => set({ selectedPatientId: id }),
@@ -100,6 +136,7 @@ export const usePatientStore = create<PatientStore>()(
           id: 'vit-' + generateId(),
           patientId,
         };
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -107,6 +144,11 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        logAudit({
+          category: 'vitals', action: 'create',
+          description: `Recorded vitals for ${ctx.patientName} — BP ${vitals.bloodPressureSystolic ?? '?'}/${vitals.bloodPressureDiastolic ?? '?'}, HR ${vitals.heartRate ?? '?'}, Temp ${vitals.temperature ?? '?'}°${vitals.temperatureUnit ?? ''}`,
+          resourceType: 'vitals', resourceId: newVitals.id, ...ctx,
+        });
       },
 
       addMedication: (patientId, med) => {
@@ -115,6 +157,7 @@ export const usePatientStore = create<PatientStore>()(
           id: 'med-' + generateId(),
           patientId,
         };
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -122,9 +165,16 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        logAudit({
+          category: 'medication', action: 'prescribe',
+          description: `Prescribed ${newMed.name} ${newMed.dosage} ${newMed.frequency} (${newMed.route}) for ${ctx.patientName}`,
+          resourceType: 'medication', resourceId: newMed.id, ...ctx,
+        });
       },
 
       updateMedication: (patientId, medId, updates) => {
+        const before = get().patients.find((p) => p.id === patientId)?.currentMedications.find((m) => m.id === medId);
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -137,9 +187,18 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        if (before) {
+          logAudit({
+            category: 'medication', action: 'edit',
+            description: `Edited medication ${before.name} for ${ctx.patientName} — fields: ${Object.keys(updates).slice(0, 8).join(', ')}`,
+            resourceType: 'medication', resourceId: medId, ...ctx,
+          });
+        }
       },
 
       deleteMedication: (patientId, medId) => {
+        const before = get().patients.find((p) => p.id === patientId)?.currentMedications.find((m) => m.id === medId);
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -147,6 +206,13 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        if (before) {
+          logAudit({
+            category: 'medication', action: 'delete', severity: 'warning',
+            description: `Removed medication ${before.name} from ${ctx.patientName}`,
+            resourceType: 'medication', resourceId: medId, ...ctx,
+          });
+        }
       },
 
       addAllergy: (patientId, allergy) => {
@@ -154,6 +220,7 @@ export const usePatientStore = create<PatientStore>()(
           ...allergy,
           id: 'alg-' + generateId(),
         };
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -161,9 +228,17 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        logAudit({
+          category: 'clinical', action: 'add_allergy',
+          description: `Added allergy ${newAllergy.allergen} for ${ctx.patientName}`,
+          resourceType: 'allergy', resourceId: newAllergy.id, ...ctx,
+          severity: newAllergy.severity === 'life-threatening' ? 'critical' : 'info',
+        });
       },
 
       updateAllergy: (patientId, allergyId, updates) => {
+        const before = get().patients.find((p) => p.id === patientId)?.allergies.find((a) => a.id === allergyId);
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -176,9 +251,19 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        if (before) {
+          logAudit({
+            category: 'clinical', action: 'edit_allergy',
+            description: `Updated allergy ${before.allergen} for ${ctx.patientName}`,
+            resourceType: 'allergy', resourceId: allergyId, ...ctx,
+            metadata: { fields: Object.keys(updates) },
+          });
+        }
       },
 
       deleteAllergy: (patientId, allergyId) => {
+        const before = get().patients.find((p) => p.id === patientId)?.allergies.find((a) => a.id === allergyId);
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -186,6 +271,13 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        if (before) {
+          logAudit({
+            category: 'clinical', action: 'delete_allergy', severity: 'warning',
+            description: `Deleted allergy ${before.allergen} for ${ctx.patientName}`,
+            resourceType: 'allergy', resourceId: allergyId, ...ctx,
+          });
+        }
       },
 
       addLabResult: (patientId, lab) => {
@@ -194,6 +286,7 @@ export const usePatientStore = create<PatientStore>()(
           id: 'lab-' + generateId(),
           patientId,
         };
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -201,9 +294,16 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        logAudit({
+          category: 'lab', action: 'order',
+          description: `Ordered lab ${newLab.testName} (${newLab.priority.toUpperCase()}) for ${ctx.patientName}${newLab.attachments?.length ? ` with ${newLab.attachments.length} attachment(s)` : ''}`,
+          resourceType: 'lab', resourceId: newLab.id, ...ctx,
+        });
       },
 
       updateLabResult: (patientId, labId, updates) => {
+        const before = get().patients.find((p) => p.id === patientId)?.labResults.find((l) => l.id === labId);
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -216,6 +316,15 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        if (before) {
+          const enteredResults = updates.status === 'resulted' && before.status !== 'resulted';
+          const addedAttachments = (updates.attachments?.length ?? 0) > (before.attachments?.length ?? 0);
+          logAudit({
+            category: 'lab', action: enteredResults ? 'enter_results' : 'edit',
+            description: `${enteredResults ? 'Entered results' : 'Edited'} for lab ${before.testName}${addedAttachments ? ' (uploaded document)' : ''} — ${ctx.patientName}`,
+            resourceType: 'lab', resourceId: labId, ...ctx,
+          });
+        }
       },
 
       addImagingOrder: (patientId, order) => {
@@ -224,6 +333,7 @@ export const usePatientStore = create<PatientStore>()(
           id: 'img-' + generateId(),
           patientId,
         };
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -231,9 +341,16 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        logAudit({
+          category: 'imaging', action: 'order',
+          description: `Ordered ${newOrder.modality} ${newOrder.bodyPart} (${newOrder.priority.toUpperCase()}) for ${ctx.patientName}${newOrder.attachments?.length ? ` with ${newOrder.attachments.length} attachment(s)` : ''}`,
+          resourceType: 'imaging', resourceId: newOrder.id, ...ctx,
+        });
       },
 
       updateImagingOrder: (patientId, orderId, updates) => {
+        const before = get().patients.find((p) => p.id === patientId)?.imagingOrders.find((o) => o.id === orderId);
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -246,6 +363,15 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        if (before) {
+          const newFindings = updates.findings && updates.findings !== before.findings;
+          const addedAttachments = (updates.attachments?.length ?? 0) > (before.attachments?.length ?? 0);
+          logAudit({
+            category: 'imaging', action: newFindings ? 'report' : 'edit',
+            description: `${newFindings ? 'Reported' : 'Edited'} ${before.modality} ${before.bodyPart}${addedAttachments ? ' (uploaded files)' : ''} — ${ctx.patientName}`,
+            resourceType: 'imaging', resourceId: orderId, ...ctx,
+          });
+        }
       },
 
       addClinicalNote: (patientId, note) => {
@@ -253,6 +379,7 @@ export const usePatientStore = create<PatientStore>()(
           ...note,
           id: 'note-' + generateId(),
         };
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -260,9 +387,16 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        logAudit({
+          category: 'clinical', action: newNote.isSigned ? 'sign' : 'create',
+          description: `${newNote.isSigned ? 'Signed' : 'Drafted'} ${newNote.type} note "${newNote.title}" for ${ctx.patientName}`,
+          resourceType: 'note', resourceId: newNote.id, ...ctx,
+        });
       },
 
       updateClinicalNote: (patientId, noteId, updates) => {
+        const before = get().patients.find((p) => p.id === patientId)?.clinicalNotes.find((n) => n.id === noteId);
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -275,6 +409,14 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        if (before) {
+          const newlySigned = updates.isSigned && !before.isSigned;
+          logAudit({
+            category: 'clinical', action: newlySigned ? 'sign' : 'edit',
+            description: `${newlySigned ? 'Signed' : 'Edited'} note "${before.title}" for ${ctx.patientName}`,
+            resourceType: 'note', resourceId: noteId, ...ctx,
+          });
+        }
       },
 
       addTriageAssessment: (patientId, triage) => {
@@ -282,6 +424,7 @@ export const usePatientStore = create<PatientStore>()(
           ...triage,
           id: 'tri-' + generateId(),
         };
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -289,9 +432,16 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        logAudit({
+          category: 'triage', action: 'create',
+          description: `Triage assessment ESI ${newTriage.esiLevel} — ${newTriage.chiefComplaint} — ${ctx.patientName}`,
+          resourceType: 'triage', resourceId: newTriage.id, ...ctx,
+          severity: newTriage.esiLevel <= 2 ? 'warning' : 'info',
+        });
       },
 
       updateTriageAssessment: (patientId, triageId, updates) => {
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -304,6 +454,12 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        logAudit({
+          category: 'triage', action: 'edit',
+          description: `Updated triage assessment for ${ctx.patientName}`,
+          resourceType: 'triage', resourceId: triageId, ...ctx,
+          metadata: { fields: Object.keys(updates) },
+        });
       },
 
       addEncounter: (patientId, encounter) => {
@@ -312,6 +468,7 @@ export const usePatientStore = create<PatientStore>()(
           id: 'enc-' + generateId(),
           patientId,
         };
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -319,9 +476,15 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        logAudit({
+          category: 'clinical', action: 'create_encounter',
+          description: `Created ${newEncounter.encounterType} encounter for ${ctx.patientName}`,
+          resourceType: 'encounter', resourceId: newEncounter.id, ...ctx,
+        });
       },
 
       updateEncounter: (patientId, encounterId, updates) => {
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -334,6 +497,12 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        logAudit({
+          category: 'clinical', action: 'edit_encounter',
+          description: `Updated encounter for ${ctx.patientName}`,
+          resourceType: 'encounter', resourceId: encounterId, ...ctx,
+          metadata: { fields: Object.keys(updates) },
+        });
       },
 
       addDiagnosis: (patientId, encounterId, diagnosis) => {
@@ -341,6 +510,7 @@ export const usePatientStore = create<PatientStore>()(
           ...diagnosis,
           id: 'diag-' + generateId(),
         };
+        const ctx = patientContext(get().patients, patientId);
         set((state) => ({
           patients: state.patients.map((p) =>
             p.id === patientId
@@ -355,6 +525,12 @@ export const usePatientStore = create<PatientStore>()(
               : p
           ),
         }));
+        logAudit({
+          category: 'clinical', action: 'add_diagnosis',
+          description: `Added ${newDiagnosis.type} diagnosis ${newDiagnosis.code}: ${newDiagnosis.description} for ${ctx.patientName}`,
+          resourceType: 'diagnosis', resourceId: newDiagnosis.id, ...ctx,
+          metadata: { encounterId },
+        });
       },
     }),
     {

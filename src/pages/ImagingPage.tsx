@@ -7,6 +7,8 @@ import { useUIStore } from '../store/uiStore';
 import { getPatientFullName, calculateAge, formatDateTime } from '../utils/helpers';
 import Modal from '../components/ui/Modal';
 import DocumentUpload from '../components/ui/DocumentUpload';
+import { PermissionGate } from '../components/ui/PermissionGate';
+import { usePermissions } from '../hooks/usePermissions';
 import type { ImagingOrder } from '../types';
 
 const MODALITIES = ['X-Ray', 'CT Scan', 'MRI', 'Ultrasound', 'Fluoroscopy', 'Nuclear Medicine', 'PET Scan', 'Mammography', 'DEXA'];
@@ -18,6 +20,7 @@ export default function ImagingPage() {
   const { patients, addImagingOrder, updateImagingOrder } = usePatientStore();
   const { currentUser } = useStaffStore();
   const { addNotification } = useUIStore();
+  const { can, canAny } = usePermissions();
 
   const [selectedPatientId, setSelectedPatientId] = useState(searchParams.get('patientId') || '');
   const [showModal, setShowModal] = useState(false);
@@ -28,6 +31,7 @@ export default function ImagingPage() {
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
 
   function openOrder() {
+    if (!can('imaging:order')) return;
     setForm({
       status: 'ordered', priority: 'routine',
       modality: MODALITIES[0], bodyPart: BODY_PARTS[0],
@@ -42,8 +46,10 @@ export default function ImagingPage() {
   function saveOrder() {
     if (!form.modality || !form.bodyPart || !form.clinicalIndication || !selectedPatientId) return;
     if (editingId) {
+      if (!canAny(['imaging:edit', 'imaging:report', 'imaging:upload_document'])) return;
       updateImagingOrder(selectedPatientId, editingId, form);
     } else {
+      if (!can('imaging:order')) return;
       addImagingOrder(selectedPatientId, {
         ...form,
         orderedBy: form.orderedBy || '',
@@ -84,7 +90,9 @@ export default function ImagingPage() {
         <div className="card">
           <div className="flex justify-between items-center mb-4">
             <h2 className="font-semibold text-gray-900">{getPatientFullName(selectedPatient)}</h2>
-            <button onClick={openOrder} className="btn-primary"><Plus size={16} /> Order Imaging</button>
+            <PermissionGate permission="imaging:order">
+              <button onClick={openOrder} className="btn-primary"><Plus size={16} /> Order Imaging</button>
+            </PermissionGate>
           </div>
           {selectedPatient.imagingOrders.length === 0 ? (
             <div className="text-center py-10 text-gray-400">
@@ -113,7 +121,9 @@ export default function ImagingPage() {
                           <Paperclip size={12} /> {img.attachments.length}
                         </span>
                       )}
-                      <button onClick={() => { setForm({ ...img, attachments: img.attachments || [] }); setEditingId(img.id); setShowModal(true); }} className="text-blue-600 hover:text-blue-700"><Edit size={15} /></button>
+                      <PermissionGate anyOf={['imaging:edit', 'imaging:report', 'imaging:upload_document']}>
+                        <button onClick={() => { setForm({ ...img, attachments: img.attachments || [] }); setEditingId(img.id); setShowModal(true); }} className="text-blue-600 hover:text-blue-700"><Edit size={15} /></button>
+                      </PermissionGate>
                     </div>
                   </div>
                   {/* Attached imaging files */}
@@ -223,14 +233,16 @@ export default function ImagingPage() {
           </div>
 
           <div className="border-t pt-3">
-            <DocumentUpload
-              attachments={form.attachments || []}
-              onChange={(att) => setForm({ ...form, attachments: att })}
-              label="Imaging files / radiology report"
-              accept="application/pdf,image/*,.dcm"
-              maxFileMB={10}
-              maxTotalMB={30}
-            />
+            <PermissionGate permission="imaging:upload_document">
+              <DocumentUpload
+                attachments={form.attachments || []}
+                onChange={(att) => setForm({ ...form, attachments: att })}
+                label="Imaging files / radiology report"
+                accept="application/pdf,image/*,.dcm"
+                maxFileMB={10}
+                maxTotalMB={30}
+              />
+            </PermissionGate>
           </div>
 
           <div className="flex gap-3 justify-end">

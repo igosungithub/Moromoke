@@ -2,32 +2,38 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, Activity,
   Pill, FlaskConical, Scan, UserCog, BarChart3,
-  Settings, Menu, X, Stethoscope, ChevronRight, Package, Baby, LogOut
+  Settings, Menu, X, Stethoscope, ChevronRight, Package, Baby, LogOut, ShieldCheck
 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useStaffStore } from '../../store/staffStore';
+import { usePermissions } from '../../hooks/usePermissions';
 import { ROLE_LABELS } from '../../utils/permissions';
 
-const navItems = [
+import type { Permission } from '../../utils/permissions';
+
+const navItems: { to: string; icon: React.ComponentType<{ size?: number; className?: string }>; label: string; exact?: boolean; permission?: Permission }[] = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
   { to: '/queue', icon: ClipboardList, label: 'Patient Queue' },
-  { to: '/patients', icon: Users, label: 'Patients' },
-  { to: '/triage', icon: Activity, label: 'Triage' },
-  { to: '/vitals', icon: Stethoscope, label: 'Vitals' },
-  { to: '/medications', icon: Pill, label: 'Medications' },
-  { to: '/drug-stock', icon: Package, label: 'Drug Stock' },
-  { to: '/labs', icon: FlaskConical, label: 'Lab Results' },
-  { to: '/imaging', icon: Scan, label: 'Imaging' },
-  { to: '/maternity', icon: Baby, label: 'Maternity & Paeds' },
-  { to: '/staff', icon: UserCog, label: 'Staff' },
-  { to: '/reports', icon: BarChart3, label: 'Reports' },
-  { to: '/settings', icon: Settings, label: 'Settings' },
+  { to: '/patients', icon: Users, label: 'Patients', permission: 'patient:view' },
+  { to: '/triage', icon: Activity, label: 'Triage', permission: 'triage:view' },
+  { to: '/vitals', icon: Stethoscope, label: 'Vitals', permission: 'vitals:view' },
+  { to: '/medications', icon: Pill, label: 'Medications', permission: 'medications:view' },
+  { to: '/drug-stock', icon: Package, label: 'Drug Stock', permission: 'drugstock:view' },
+  { to: '/labs', icon: FlaskConical, label: 'Lab Results', permission: 'labs:view' },
+  { to: '/imaging', icon: Scan, label: 'Imaging', permission: 'imaging:view' },
+  { to: '/maternity', icon: Baby, label: 'Maternity & Paeds', permission: 'maternity:view' },
+  { to: '/staff', icon: UserCog, label: 'Staff', permission: 'staff:view' },
+  { to: '/reports', icon: BarChart3, label: 'Reports', permission: 'reports:view' },
+  { to: '/audit', icon: ShieldCheck, label: 'Audit Log', permission: 'audit:view' },
+  { to: '/settings', icon: Settings, label: 'Settings', permission: 'settings:view' },
 ];
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
   const { currentUser, logout } = useStaffStore();
+  const { can, roles } = usePermissions();
+  const visibleNav = navItems.filter((item) => !item.permission || can(item.permission));
 
   function handleLogout() {
     logout();
@@ -64,7 +70,7 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 py-4 overflow-y-auto">
         <ul className="space-y-1 px-2">
-          {navItems.map(({ to, icon: Icon, label, exact }) => (
+          {visibleNav.map(({ to, icon: Icon, label, exact }) => (
             <li key={to}>
               <NavLink
                 to={to}
@@ -105,7 +111,9 @@ export default function Sidebar() {
                 <p className="text-sm font-medium truncate">
                   {currentUser.firstName} {currentUser.lastName}
                 </p>
-                <p className="text-xs text-slate-400">{currentUser.role ? ROLE_LABELS[currentUser.role] : ''}</p>
+                <p className="text-xs text-slate-400 truncate" title={roles.map((r) => ROLE_LABELS[r]).join(', ')}>
+                  {roles.map((r) => ROLE_LABELS[r]).join(' + ')}
+                </p>
                 {currentUser.username && (
                   <p className="text-[10px] text-slate-500 font-mono truncate">@{currentUser.username}</p>
                 )}

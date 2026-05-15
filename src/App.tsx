@@ -16,7 +16,9 @@ import SettingsPage from './pages/SettingsPage';
 import DrugStockPage from './pages/DrugStockPage';
 import MaternityPage from './pages/MaternityPage';
 import LoginPage from './pages/LoginPage';
+import AuditLogPage from './pages/AuditLogPage';
 import { useStaffStore } from './store/staffStore';
+import RequirePermission from './components/ui/RequirePermission';
 
 function ProtectedRoute() {
   const { isAuthenticated, currentUser } = useStaffStore();
@@ -40,19 +42,20 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/queue" element={<PatientQueue />} />
-            <Route path="/patients" element={<PatientList />} />
-            <Route path="/patients/new" element={<PatientRegistration />} />
-            <Route path="/patients/:id" element={<PatientDetail />} />
-            <Route path="/triage" element={<TriagePage />} />
-            <Route path="/vitals" element={<VitalsPage />} />
-            <Route path="/medications" element={<MedicationsPage />} />
-            <Route path="/labs" element={<LabsPage />} />
-            <Route path="/imaging" element={<ImagingPage />} />
-            <Route path="/drug-stock" element={<DrugStockPage />} />
-            <Route path="/maternity" element={<MaternityPage />} />
-            <Route path="/staff" element={<StaffPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/patients" element={<RequirePermission permission="patient:view"><PatientList /></RequirePermission>} />
+            <Route path="/patients/new" element={<RequirePermission permission="patient:create"><PatientRegistration /></RequirePermission>} />
+            <Route path="/patients/:id" element={<RequirePermission permission="patient:view"><PatientDetail /></RequirePermission>} />
+            <Route path="/triage" element={<RequirePermission permission="triage:view"><TriagePage /></RequirePermission>} />
+            <Route path="/vitals" element={<RequirePermission permission="vitals:view"><VitalsPage /></RequirePermission>} />
+            <Route path="/medications" element={<RequirePermission permission="medications:view"><MedicationsPage /></RequirePermission>} />
+            <Route path="/labs" element={<RequirePermission permission="labs:view"><LabsPage /></RequirePermission>} />
+            <Route path="/imaging" element={<RequirePermission permission="imaging:view"><ImagingPage /></RequirePermission>} />
+            <Route path="/drug-stock" element={<RequirePermission permission="drugstock:view"><DrugStockPage /></RequirePermission>} />
+            <Route path="/maternity" element={<RequirePermission permission="maternity:view"><MaternityPage /></RequirePermission>} />
+            <Route path="/staff" element={<RequirePermission permission="staff:view"><StaffPage /></RequirePermission>} />
+            <Route path="/reports" element={<RequirePermission permission="reports:view"><ReportsPage /></RequirePermission>} />
+            <Route path="/settings" element={<RequirePermission permission="settings:view"><SettingsPage /></RequirePermission>} />
+            <Route path="/audit" element={<RequirePermission permission="audit:view"><AuditLogPage /></RequirePermission>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Route>

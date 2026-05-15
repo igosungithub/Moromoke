@@ -245,12 +245,15 @@ export interface Patient {
   advanceDirective?: boolean;
 }
 
+export type StaffRole = 'physician' | 'nurse' | 'technician' | 'admin' | 'pharmacist' | 'radiologist' | 'pa' | 'np';
+
 export interface Staff {
   id: string;
   employeeId: string;
   firstName: string;
   lastName: string;
-  role: 'physician' | 'nurse' | 'technician' | 'admin' | 'pharmacist' | 'radiologist' | 'pa' | 'np';
+  role: StaffRole;            // Primary role
+  additionalRoles?: StaffRole[]; // Extra roles granted by admin (e.g., physician + admin)
   specialty?: string;
   department: string;
   licenseNumber?: string;

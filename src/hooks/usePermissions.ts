@@ -1,14 +1,15 @@
 import { useStaffStore } from '../store/staffStore';
-import { hasPermission, hasAnyPermission, type Permission } from '../utils/permissions';
+import { hasPermission, hasAnyPermission, getStaffRoles, type Permission } from '../utils/permissions';
 
 export function usePermissions() {
   const currentUser = useStaffStore((s) => s.currentUser);
-  const role = currentUser?.role;
+  const roles = getStaffRoles(currentUser);
 
   return {
-    can: (permission: Permission) => hasPermission(role, permission),
-    canAny: (permissions: Permission[]) => hasAnyPermission(role, permissions),
-    role,
+    can: (permission: Permission) => hasPermission(currentUser, permission),
+    canAny: (permissions: Permission[]) => hasAnyPermission(currentUser, permissions),
+    role: currentUser?.role,
+    roles,
     currentUser,
   };
 }

@@ -6,6 +6,7 @@ import {
 import { useDrugStore } from '../store/drugStore';
 import { useStaffStore } from '../store/staffStore';
 import { PermissionGate } from '../components/ui/PermissionGate';
+import { usePermissions } from '../hooks/usePermissions';
 import Modal from '../components/ui/Modal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import DrugSearchImport from '../components/drugs/DrugSearchImport';
@@ -59,6 +60,7 @@ const emptyDrug = (): Omit<DrugStockItem, 'id' | 'createdAt' | 'updatedAt'> => (
 export default function DrugStockPage() {
   const { drugs, addDrug, updateDrug, deleteDrug, restockDrug } = useDrugStore();
   const { currentUser } = useStaffStore();
+  const { can } = usePermissions();
 
   const [tab, setTab] = useState<'inventory' | 'search' | 'add'>('inventory');
   const [search, setSearch] = useState('');
@@ -105,6 +107,7 @@ export default function DrugStockPage() {
   const totalValue = drugs.filter((d) => d.isActive).reduce((s, d) => s + d.quantityInStock * d.unitCost, 0);
 
   function openAdd() {
+    if (!can('drugstock:create')) return;
     setForm(emptyDrug());
     setTagInput({ contraindications: '', sideEffects: '', interactions: '' });
     setEditingId(null);
@@ -112,6 +115,7 @@ export default function DrugStockPage() {
   }
 
   function openEdit(drug: DrugStockItem) {
+    if (!can('drugstock:edit')) return;
     setForm({ ...drug });
     setTagInput({ contraindications: '', sideEffects: '', interactions: '' });
     setEditingId(drug.id);
@@ -121,9 +125,11 @@ export default function DrugStockPage() {
   function saveDrug() {
     if (!form.name || !form.genericName) return;
     if (editingId) {
+      if (!can('drugstock:edit')) return;
       updateDrug(editingId, form);
       setEditModal(false);
     } else {
+      if (!can('drugstock:create')) return;
       addDrug(form);
       setAddModal(false);
     }
@@ -132,6 +138,7 @@ export default function DrugStockPage() {
 
   function doRestock() {
     if (!selectedDrug || restockQty <= 0) return;
+    if (!can('drugstock:edit')) return;
     restockDrug(selectedDrug.id, restockQty, currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Staff');
     setRestockModal(false);
     setRestockQty(100);
@@ -280,9 +287,9 @@ export default function DrugStockPage() {
       <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
         {[
           { id: 'inventory', label: 'Inventory', icon: Package },
-          { id: 'search', label: 'Search & Import (RxNorm/OpenFDA)', icon: Globe },
+          { id: 'search', label: 'Search & Import Sources', icon: Globe },
           { id: 'add', label: 'Add Manually', icon: Plus },
-        ].map(({ id, label, icon: Icon }) => (
+        ].filter((item) => item.id !== 'add' || can('drugstock:create')).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => { if (id === 'add') { setTab('inventory'); openAdd(); } else setTab(id as typeof tab); }}
@@ -370,6 +377,11 @@ export default function DrugStockPage() {
                       {CONTROLLED_LABEL[drug.controlledStatus]}
                     </span>
                   )}
+                  {drug.sourceMetadata?.sources?.length ? (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                      {drug.sourceMetadata.sources.join(' + ')}
+                    </span>
+                  ) : null}
                   <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{CATEGORY_LABELS[drug.category]}</span>
                 </div>
                 <p className="text-sm text-gray-500 mt-0.5">{drug.strength} · {drug.formulation} · {drug.routes.map((r) => ROUTE_LABELS[r]).join(', ')}</p>
@@ -383,7 +395,7 @@ export default function DrugStockPage() {
                 <p className="text-xs text-gray-400">{drug.location}</p>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
-                <PermissionGate permission="drugstock:dispense">
+                <PermissionGate permission="drugstock:edit">
                   <button
                     onClick={(e) => { e.stopPropagation(); setSelectedDrug(drug); setRestockQty(drug.reorderQuantity); setRestockModal(true); }}
                     className="p-1.5 text-green-600 hover:bg-green-50 rounded"
@@ -467,6 +479,18 @@ export default function DrugStockPage() {
                     <p className="text-xs text-gray-600">{drug.storageConditions}</p>
                     <p className="text-xs text-gray-500 mt-0.5">Location: {drug.location}</p>
                     <p className="text-xs text-gray-500">Batch: {drug.batchNumber} · Manufacturer: {drug.manufacturer}</p>
+                    {drug.sourceMetadata && (
+                      <div className="mt-2 text-xs text-gray-500 space-y-0.5">
+                        {drug.sourceMetadata.rxcui && <p>RxCUI: {drug.sourceMetadata.rxcui}</p>}
+                        {drug.sourceMetadata.ndcProductCode && <p>NDC product: {drug.sourceMetadata.ndcProductCode}</p>}
+                        {drug.sourceMetadata.splSetId && <p>DailyMed SetID: {drug.sourceMetadata.splSetId}</p>}
+                        {drug.sourceMetadata.labelUrl && (
+                          <a href={drug.sourceMetadata.labelUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            Open DailyMed label
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -511,7 +535,7 @@ export default function DrugStockPage() {
       <ConfirmDialog
         isOpen={!!deleteConfirm}
         onClose={() => setDeleteConfirm(null)}
-        onConfirm={() => { if (deleteConfirm) deleteDrug(deleteConfirm); }}
+        onConfirm={() => { if (deleteConfirm && can('drugstock:delete')) deleteDrug(deleteConfirm); }}
         title="Delete Drug Record"
         message="Remove this drug from the stock list? Historical records will be retained."
       />

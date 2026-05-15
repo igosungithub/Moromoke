@@ -5,6 +5,7 @@ import { usePatientStore } from '../store/patientStore';
 import { useStaffStore } from '../store/staffStore';
 import { useUIStore } from '../store/uiStore';
 import { PermissionGate } from '../components/ui/PermissionGate';
+import { usePermissions } from '../hooks/usePermissions';
 import Modal from '../components/ui/Modal';
 import { getPatientFullName, formatDate } from '../utils/helpers';
 import type {
@@ -25,6 +26,7 @@ export default function MaternityPage() {
   const { patients } = usePatientStore();
   const { currentUser } = useStaffStore();
   const { addNotification } = useUIStore();
+  const { can } = usePermissions();
 
   const [mainTab, setMainTab] = useState<MainTab>('antenatal');
   const [patientSearch, setPatientSearch] = useState('');
@@ -85,8 +87,10 @@ export default function MaternityPage() {
   function saveBooking() {
     if (!bookingPatientId || !bookingForm.lmpDate) return;
     if (editingBookingId) {
+      if (!can('maternity:edit')) return;
       updateBooking(editingBookingId, { ...bookingForm });
     } else {
+      if (!can('maternity:create')) return;
       addBooking({
         ...(bookingForm as Omit<AntenatalBooking, 'id' | 'createdAt' | 'updatedAt'>),
         patientId: bookingPatientId,
@@ -112,6 +116,7 @@ export default function MaternityPage() {
   // ---- Visit save ----
   function saveVisit() {
     if (!visitBookingId) return;
+    if (!can('maternity:create')) return;
     const booking = bookings.find((b) => b.id === visitBookingId);
     if (!booking) return;
     addAntenatalVisit({ ...(visitForm as Omit<AntenatalVisit, 'id'>), patientId: booking.patientId, bookingId: visitBookingId, visitDate: new Date().toISOString() });
@@ -122,6 +127,7 @@ export default function MaternityPage() {
   // ---- Postnatal save ----
   function savePostnatal() {
     if (!postnatalPatientId) return;
+    if (!can('maternity:create')) return;
     addPostnatalAssessment({ ...(postnatalForm as Omit<PostnatalAssessment, 'id' | 'createdAt'>), patientId: postnatalPatientId, assessmentDate: new Date().toISOString() });
     setPostnatalModal(false);
     addNotification({ type: 'success', title: 'Postnatal assessment saved' });
@@ -131,8 +137,10 @@ export default function MaternityPage() {
   function savePaediatric() {
     if (!paedPatientId) return;
     if (editingPaedId) {
+      if (!can('maternity:edit')) return;
       updatePaediatricRecord(editingPaedId, paedForm);
     } else {
+      if (!can('maternity:create')) return;
       addPaediatricRecord({ ...(paedForm as Omit<PaediatricRecord, 'id' | 'createdAt'>), patientId: paedPatientId, assessmentDate: new Date().toISOString() });
     }
     setPaedModal(false);

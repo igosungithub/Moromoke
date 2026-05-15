@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { DrugStockItem, DrugDispenseRecord, DrugStockAdjustment } from '../types/drugStock';
+import { logAudit } from './auditStore';
 
 function genId() {
   return Math.random().toString(36).slice(2, 10);
@@ -372,18 +373,39 @@ export const useDrugStore = create<DrugStore>()(
         const now = new Date().toISOString();
         const newDrug: DrugStockItem = { ...drug, id: genId(), createdAt: now, updatedAt: now };
         set((s) => ({ drugs: [newDrug, ...s.drugs] }));
+        logAudit({
+          category: 'drugstock', action: 'create',
+          description: `Added drug to inventory: ${newDrug.name} ${newDrug.strength} (qty ${newDrug.quantityInStock})`,
+          resourceType: 'drug', resourceId: newDrug.id,
+        });
       },
 
       updateDrug: (id, updates) => {
+        const before = get().drugs.find((d) => d.id === id);
         set((s) => ({
           drugs: s.drugs.map((d) =>
             d.id === id ? { ...d, ...updates, updatedAt: new Date().toISOString() } : d
           ),
         }));
+        if (before) {
+          logAudit({
+            category: 'drugstock', action: 'edit',
+            description: `Edited drug: ${before.name} ${before.strength} — fields: ${Object.keys(updates).slice(0, 6).join(', ')}`,
+            resourceType: 'drug', resourceId: id,
+          });
+        }
       },
 
       deleteDrug: (id) => {
+        const removed = get().drugs.find((d) => d.id === id);
         set((s) => ({ drugs: s.drugs.filter((d) => d.id !== id) }));
+        if (removed) {
+          logAudit({
+            category: 'drugstock', action: 'delete', severity: 'warning',
+            description: `Removed drug from inventory: ${removed.name} ${removed.strength}`,
+            resourceType: 'drug', resourceId: id,
+          });
+        }
       },
 
       dispenseDrug: (record) => {
@@ -411,6 +433,13 @@ export const useDrugStore = create<DrugStore>()(
           performedAt: new Date().toISOString(),
         };
         set((s) => ({ adjustments: [adjustment, ...s.adjustments] }));
+        logAudit({
+          category: 'drugstock', action: 'dispense',
+          description: `Dispensed ${record.quantity} × ${drug.name} ${drug.strength} to ${record.patientName} (remaining stock: ${drug.quantityInStock - record.quantity})`,
+          resourceType: 'drug', resourceId: drug.id,
+          patientId: record.patientId, patientName: record.patientName,
+          severity: drug.quantityInStock - record.quantity <= drug.reorderLevel ? 'warning' : 'info',
+        });
       },
 
       adjustStock: (adj) => {
@@ -423,6 +452,12 @@ export const useDrugStore = create<DrugStore>()(
               : d
           ),
         }));
+        logAudit({
+          category: 'drugstock', action: 'adjust_stock',
+          description: `Adjusted ${adj.drugName}: ${adj.previousStock} to ${adj.newStock} (${adj.reason})`,
+          resourceType: 'drug', resourceId: adj.drugId,
+          severity: adj.newStock <= 0 ? 'warning' : 'info',
+        });
       },
 
       restockDrug: (drugId, quantity, performedBy) => {
@@ -441,6 +476,11 @@ export const useDrugStore = create<DrugStore>()(
           performedBy,
           performedAt: new Date().toISOString(),
         };
+        logAudit({
+          category: 'drugstock', action: 'restock',
+          description: `Restocked ${drug.name} ${drug.strength}: +${quantity} → ${newStock} total`,
+          resourceType: 'drug', resourceId: drug.id,
+        });
         set((s) => ({
           adjustments: [adjustment, ...s.adjustments],
           drugs: s.drugs.map((d) =>

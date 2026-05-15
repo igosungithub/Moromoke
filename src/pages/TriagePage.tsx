@@ -12,6 +12,7 @@ import {
 } from '../utils/triageProtocols';
 import { getPatientFullName } from '../utils/helpers';
 import { PermissionGate } from '../components/ui/PermissionGate';
+import { usePermissions } from '../hooks/usePermissions';
 import { getClinicalSuggestions, type ClinicalAiResponse } from '../services/clinicalAi';
 
 const ESI_CONFIG = {
@@ -30,6 +31,7 @@ export default function TriagePage() {
   const { patients, addTriageAssessment } = usePatientStore();
   const { currentUser } = useStaffStore();
   const { addNotification } = useUIStore();
+  const { can } = usePermissions();
 
   const preselectedId = searchParams.get('patientId');
 
@@ -118,6 +120,7 @@ export default function TriagePage() {
 
   function handleSave() {
     if (!selectedPatientId || !protocol) return;
+    if (!can('triage:create')) return;
     const staffName = currentUser ? `${currentUser.firstName} ${currentUser.lastName}` : 'Staff';
     const questionAnswers = protocol.questions
       .map((q, i) => answers[i] ? `Q: ${q}\nA: ${answers[i]}` : null)

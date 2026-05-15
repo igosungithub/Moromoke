@@ -7,6 +7,8 @@ import { useUIStore } from '../store/uiStore';
 import { getPatientFullName, calculateAge, formatDateTime } from '../utils/helpers';
 import Modal from '../components/ui/Modal';
 import DocumentUpload from '../components/ui/DocumentUpload';
+import { PermissionGate } from '../components/ui/PermissionGate';
+import { usePermissions } from '../hooks/usePermissions';
 import type { LabResult, LabResultItem, AttachedDocument } from '../types';
 
 const LAB_CATEGORIES = [
@@ -21,6 +23,7 @@ export default function LabsPage() {
   const { patients, addLabResult, updateLabResult } = usePatientStore();
   const { currentUser } = useStaffStore();
   const { addNotification } = useUIStore();
+  const { can } = usePermissions();
 
   const [selectedPatientId, setSelectedPatientId] = useState(searchParams.get('patientId') || '');
   const [showModal, setShowModal] = useState(false);
@@ -34,6 +37,7 @@ export default function LabsPage() {
   const selectedPatient = patients.find((p) => p.id === selectedPatientId);
 
   function openOrder() {
+    if (!can('labs:order')) return;
     setForm({
       status: 'ordered',
       priority: 'routine',
@@ -49,8 +53,10 @@ export default function LabsPage() {
   function saveOrder() {
     if (!form.testName || !selectedPatientId) return;
     if (editingId) {
+      if (!can('labs:edit')) return;
       updateLabResult(selectedPatientId, editingId, form);
     } else {
+      if (!can('labs:order')) return;
       addLabResult(selectedPatientId, {
         ...form,
         testName: form.testName!,
@@ -67,6 +73,7 @@ export default function LabsPage() {
 
   function saveResults() {
     if (!resultsModal || !selectedPatientId) return;
+    if (!can('labs:enter_results')) return;
     const existing = selectedPatient?.labResults.find((l) => l.id === resultsModal);
     const mergedAttachments = [...(existing?.attachments || []), ...resultsAttachments]
       .filter((a, i, arr) => arr.findIndex((x) => x.id === a.id) === i);
@@ -106,7 +113,9 @@ export default function LabsPage() {
         <div className="card">
           <div className="flex justify-between items-center mb-4">
             <h2 className="font-semibold text-gray-900">{getPatientFullName(selectedPatient)}</h2>
-            <button onClick={openOrder} className="btn-primary"><Plus size={16} /> Order Lab</button>
+            <PermissionGate permission="labs:order">
+              <button onClick={openOrder} className="btn-primary"><Plus size={16} /> Order Lab</button>
+            </PermissionGate>
           </div>
           {selectedPatient.labResults.length === 0 ? (
             <div className="text-center py-10 text-gray-400">
@@ -129,13 +138,16 @@ export default function LabsPage() {
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${lab.status === 'resulted' ? 'badge-green' : lab.status === 'processing' ? 'badge-blue' : 'badge-gray'}`}>
                         {lab.status}
                       </span>
-                      <button onClick={() => { setForm(lab); setEditingId(lab.id); setShowModal(true); }} className="text-blue-600 hover:text-blue-700"><Edit size={15} /></button>
+                      <PermissionGate permission="labs:edit">
+                        <button onClick={() => { setForm(lab); setEditingId(lab.id); setShowModal(true); }} className="text-blue-600 hover:text-blue-700"><Edit size={15} /></button>
+                      </PermissionGate>
                       {lab.attachments && lab.attachments.length > 0 && (
                         <span className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full" title="Attached documents">
                           <Paperclip size={12} /> {lab.attachments.length}
                         </span>
                       )}
                       {lab.status !== 'resulted' && (
+                        <PermissionGate permission="labs:enter_results">
                         <button
                           onClick={() => {
                             setResultItems(lab.results || [{ name: '', value: '', unit: '', referenceRange: '' }]);
@@ -146,6 +158,7 @@ export default function LabsPage() {
                         >
                           Enter Results
                         </button>
+                        </PermissionGate>
                       )}
                     </div>
                   </div>
@@ -251,11 +264,13 @@ export default function LabsPage() {
           </div>
 
           <div className="border-t pt-3">
-            <DocumentUpload
-              attachments={form.attachments || []}
-              onChange={(att) => setForm({ ...form, attachments: att })}
-              label="Attach lab report / requisition / external results"
-            />
+            <PermissionGate permission="labs:upload_document">
+              <DocumentUpload
+                attachments={form.attachments || []}
+                onChange={(att) => setForm({ ...form, attachments: att })}
+                label="Attach lab report / requisition / external results"
+              />
+            </PermissionGate>
           </div>
 
           <div className="flex gap-3 justify-end">
@@ -291,11 +306,13 @@ export default function LabsPage() {
           </button>
 
           <div className="mt-4 border-t pt-3">
-            <DocumentUpload
-              attachments={resultsAttachments}
-              onChange={setResultsAttachments}
-              label="Upload result PDF / scan / external report"
-            />
+            <PermissionGate permission="labs:upload_document">
+              <DocumentUpload
+                attachments={resultsAttachments}
+                onChange={setResultsAttachments}
+                label="Upload result PDF / scan / external report"
+              />
+            </PermissionGate>
           </div>
 
           <div className="flex gap-3 justify-end mt-4">
