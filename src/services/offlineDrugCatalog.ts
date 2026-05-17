@@ -53,19 +53,32 @@ let indexCache: OfflineCatalogIndex | null = null;
 let indexLoadPromise: Promise<OfflineCatalogIndex | null> | null = null;
 const partitionCache = new Map<number, OfflineCatalogDetail[]>();
 
-// Where to fetch the catalog index from. Defaults to the same origin as the
-// SPA (so /drug-catalogs/index.json on the deployed site). Override with the
-// VITE_DRUG_DETAILS_BASE_URL env var when you want to host the larger
-// details bundle on a separate origin — e.g. a Cloudflare R2 public bucket
-// like https://r2-moromoke.<account>.r2.dev or your custom domain.
+// Catalog files can live at multiple locations. The client tries each URL
+// candidate in order and stops at the first one that returns a usable file.
+// This makes the deployment forgiving: a misconfigured R2 base URL, a missing
+// upload, or a typo in the bucket layout all transparently fall back to the
+// 14 MB index that ships with the build (served same-origin from
+// /drug-catalogs/index.json).
 const DETAILS_BASE = (import.meta.env.VITE_DRUG_DETAILS_BASE_URL || '').replace(/\/$/, '');
-const INDEX_URL = DETAILS_BASE
-  ? `${DETAILS_BASE}/index.json`
-  : '/drug-catalogs/index.json';
-const DETAIL_URL = (partition: number) => {
+const INDEX_URL_CANDIDATES: string[] = [
+  // 1. R2 / external base, files at the bucket root
+  ...(DETAILS_BASE ? [`${DETAILS_BASE}/index.json`] : []),
+  // 2. R2 / external base, files under a drug-catalogs/ prefix (common when
+  //    the local public/drug-catalogs folder was uploaded recursively)
+  ...(DETAILS_BASE ? [`${DETAILS_BASE}/drug-catalogs/index.json`] : []),
+  // 3. Same-origin — bundled with the build, always available
+  '/drug-catalogs/index.json',
+];
+function detailUrlCandidates(partition: number): string[] {
   const file = `details/part-${String(partition).padStart(4, '0')}.json`;
-  return DETAILS_BASE ? `${DETAILS_BASE}/${file}` : `/drug-catalogs/${file}`;
-};
+  const list: string[] = [];
+  if (DETAILS_BASE) {
+    list.push(`${DETAILS_BASE}/${file}`);
+    list.push(`${DETAILS_BASE}/drug-catalogs/${file}`);
+  }
+  list.push(`/drug-catalogs/${file}`);
+  return list;
+}
 
 export function offlineCatalogAvailable(): boolean {
   return indexCache !== null;
@@ -83,30 +96,35 @@ export async function loadOfflineCatalog(): Promise<OfflineCatalogIndex | null> 
   if (indexCache) return indexCache;
   if (indexLoadPromise) return indexLoadPromise;
   indexLoadPromise = (async () => {
+    const failureLog: string[] = [];
     try {
-      const res = await fetch(INDEX_URL, { cache: 'force-cache' });
-      if (!res.ok) {
-        lastLoadError = `HTTP ${res.status} from ${INDEX_URL}`;
-        return null;
+      for (const url of INDEX_URL_CANDIDATES) {
+        try {
+          const res = await fetch(url, { cache: 'force-cache' });
+          if (!res.ok) {
+            failureLog.push(`${url} → HTTP ${res.status}`);
+            continue;
+          }
+          let data: OfflineCatalogIndex;
+          try {
+            data = (await res.json()) as OfflineCatalogIndex;
+          } catch (parseErr) {
+            failureLog.push(`${url} → JSON parse error (${(parseErr as Error).message})`);
+            continue;
+          }
+          if (!data || typeof data.count !== 'number' || !Array.isArray(data.entries)) {
+            failureLog.push(`${url} → wrong shape (missing count/entries)`);
+            continue;
+          }
+          indexCache = data;
+          lastLoadError = null;
+          return data;
+        } catch (err) {
+          failureLog.push(`${url} → ${(err as Error).message}`);
+        }
       }
-      // res.json() can fail on giant payloads (low-memory devices) or if the
-      // file is truncated. Surface that reason instead of swallowing it.
-      let data: OfflineCatalogIndex;
-      try {
-        data = (await res.json()) as OfflineCatalogIndex;
-      } catch (parseErr) {
-        lastLoadError = `Could not parse catalog JSON (${(parseErr as Error).message}). The 14 MB file may have been truncated or the browser is out of memory.`;
-        return null;
-      }
-      if (!data || typeof data.count !== 'number' || !Array.isArray(data.entries)) {
-        lastLoadError = `Catalog file at ${INDEX_URL} has the wrong shape (missing count/entries).`;
-        return null;
-      }
-      indexCache = data;
-      lastLoadError = null;
-      return data;
-    } catch (e) {
-      lastLoadError = `Network error fetching ${INDEX_URL}: ${(e as Error).message}`;
+      // All candidates failed
+      lastLoadError = `Tried ${INDEX_URL_CANDIDATES.length} catalog source(s). All failed:\n${failureLog.join('\n')}`;
       return null;
     } finally {
       indexLoadPromise = null;
@@ -153,14 +171,21 @@ export async function searchOfflineCatalog(query: string, limit = 30): Promise<O
 export async function loadDetail(entry: OfflineCatalogEntry): Promise<OfflineCatalogDetail | null> {
   const part = entry.partition;
   if (!partitionCache.has(part)) {
-    try {
-      const res = await fetch(DETAIL_URL(part), { cache: 'force-cache' });
-      if (!res.ok) return null;
-      const arr = (await res.json()) as OfflineCatalogDetail[];
-      partitionCache.set(part, arr);
-    } catch {
-      return null;
+    // Walk the candidate URLs (R2 root → R2 with drug-catalogs/ prefix →
+    // same-origin) and take the first 200 OK we can parse.
+    let loaded: OfflineCatalogDetail[] | null = null;
+    for (const url of detailUrlCandidates(part)) {
+      try {
+        const res = await fetch(url, { cache: 'force-cache' });
+        if (!res.ok) continue;
+        loaded = (await res.json()) as OfflineCatalogDetail[];
+        break;
+      } catch {
+        // try next candidate
+      }
     }
+    if (!loaded) return null;
+    partitionCache.set(part, loaded);
   }
   const bucket = partitionCache.get(part);
   if (!bucket) return null;
