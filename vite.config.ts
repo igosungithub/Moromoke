@@ -4,6 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 import { copyFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 // Emit dist/404.html as a copy of dist/index.html after build.
 // Cloudflare Pages auto-serves /404.html for any path that doesn't match
 // a static asset; since 404.html IS the SPA shell, React Router takes
@@ -23,7 +25,7 @@ function emitSpaFallback() {
 }
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), emitSpaFallback()],
+  plugins: [react(), tailwindcss(), emitSpaFallback(), cloudflare()],
   preview: { port: 4174 },
   server: {
     port: 5173,
