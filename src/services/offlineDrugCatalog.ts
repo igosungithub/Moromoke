@@ -71,17 +71,42 @@ export function offlineCatalogAvailable(): boolean {
   return indexCache !== null;
 }
 
+// The last loading error message, so UI can show *why* the catalog is missing
+// (network failure, HTTP 404, JSON parse error, etc.) instead of just
+// "not built".
+let lastLoadError: string | null = null;
+export function lastOfflineCatalogError(): string | null {
+  return lastLoadError;
+}
+
 export async function loadOfflineCatalog(): Promise<OfflineCatalogIndex | null> {
   if (indexCache) return indexCache;
   if (indexLoadPromise) return indexLoadPromise;
   indexLoadPromise = (async () => {
     try {
       const res = await fetch(INDEX_URL, { cache: 'force-cache' });
-      if (!res.ok) return null;
-      const data = (await res.json()) as OfflineCatalogIndex;
+      if (!res.ok) {
+        lastLoadError = `HTTP ${res.status} from ${INDEX_URL}`;
+        return null;
+      }
+      // res.json() can fail on giant payloads (low-memory devices) or if the
+      // file is truncated. Surface that reason instead of swallowing it.
+      let data: OfflineCatalogIndex;
+      try {
+        data = (await res.json()) as OfflineCatalogIndex;
+      } catch (parseErr) {
+        lastLoadError = `Could not parse catalog JSON (${(parseErr as Error).message}). The 14 MB file may have been truncated or the browser is out of memory.`;
+        return null;
+      }
+      if (!data || typeof data.count !== 'number' || !Array.isArray(data.entries)) {
+        lastLoadError = `Catalog file at ${INDEX_URL} has the wrong shape (missing count/entries).`;
+        return null;
+      }
       indexCache = data;
+      lastLoadError = null;
       return data;
-    } catch {
+    } catch (e) {
+      lastLoadError = `Network error fetching ${INDEX_URL}: ${(e as Error).message}`;
       return null;
     } finally {
       indexLoadPromise = null;

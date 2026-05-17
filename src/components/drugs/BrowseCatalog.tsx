@@ -7,6 +7,7 @@ import {
   browseOfflineCatalog,
   loadOfflineCatalog,
   searchOfflineCatalog,
+  lastOfflineCatalogError,
   type OfflineCatalogEntry,
 } from '../../services/offlineDrugCatalog';
 import { useDrugStore } from '../../store/drugStore';
@@ -84,7 +85,11 @@ export default function BrowseCatalog() {
   const { addNotification } = useUIStore();
   const { can } = usePermissions();
 
-  const [available, setAvailable] = useState<number | null>(null);
+  // Tri-state lifecycle so "still loading" can be distinguished from
+  // "load completed but failed". Previously both used `null` which made
+  // the spinner run forever when the catalog failed to load on Workers.
+  type CatalogState = { status: 'loading' } | { status: 'ready'; count: number } | { status: 'error'; reason: string };
+  const [catalog, setCatalog] = useState<CatalogState>({ status: 'loading' });
   const [page, setPage] = useState(1);
   const [items, setItems] = useState<OfflineCatalogEntry[]>([]);
   const [total, setTotal] = useState(0);
@@ -95,12 +100,19 @@ export default function BrowseCatalog() {
   const [importing, setImporting] = useState(false);
   const [hideAlreadyInStock, setHideAlreadyInStock] = useState(false);
 
-  // Detect catalog presence on mount
+  // Detect catalog presence on mount; retriable via the Retry button.
+  async function probeCatalog() {
+    setCatalog({ status: 'loading' });
+    const idx = await loadOfflineCatalog();
+    if (idx && typeof idx.count === 'number') {
+      setCatalog({ status: 'ready', count: idx.count });
+    } else {
+      setCatalog({ status: 'error', reason: lastOfflineCatalogError() || 'Unknown failure loading offline catalog.' });
+    }
+  }
+
   useEffect(() => {
-    (async () => {
-      const idx = await loadOfflineCatalog();
-      setAvailable(idx?.count ?? null);
-    })();
+    probeCatalog();
   }, []);
 
   // Debounce the filter input
@@ -227,27 +239,36 @@ export default function BrowseCatalog() {
     }
   }
 
-  if (available === null) {
+  if (catalog.status === 'loading') {
     return (
       <div className="card text-center py-12 text-gray-500">
         <Loader2 size={28} className="mx-auto animate-spin opacity-50 mb-2" />
         <p className="text-sm">Loading offline catalog…</p>
+        <p className="text-xs text-gray-400 mt-1">Fetching 14 MB index — first load takes a few seconds.</p>
       </div>
     );
   }
 
-  if (available === 0) {
+  if (catalog.status === 'error') {
     return (
       <div className="card text-center py-12 text-gray-500">
         <Library size={36} className="mx-auto opacity-40 mb-2" />
-        <p className="font-medium text-gray-700">Offline catalog not built</p>
-        <p className="text-xs text-gray-500 mt-1">
-          Run <code className="bg-gray-100 px-1 py-0.5 rounded">npm run download:drug-catalogs -- --include-large-files</code> then
+        <p className="font-medium text-gray-700">Offline catalog couldn't be loaded</p>
+        <p className="text-xs text-red-600 mt-2 max-w-md mx-auto break-words">{catalog.reason}</p>
+        <p className="text-xs text-gray-500 mt-3 max-w-md mx-auto">
+          If you're running locally and the file is missing, run{' '}
+          <code className="bg-gray-100 px-1 py-0.5 rounded">npm run download:drug-catalogs -- --include-large-files</code> then
           <code className="bg-gray-100 px-1 py-0.5 rounded ml-1">node scripts/normalize-drug-catalogs.mjs</code>.
+          Otherwise this is usually a transient network or browser-memory issue — try again.
         </p>
+        <button onClick={probeCatalog} className="btn-primary text-xs mt-4">
+          Retry
+        </button>
       </div>
     );
   }
+
+  const available = catalog.count;
 
   return (
     <div className="space-y-3">
