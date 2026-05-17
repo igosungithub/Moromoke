@@ -7,6 +7,9 @@ import type {
 import { samplePatients } from '../utils/sampleData';
 import { generateId, generateMRN } from '../utils/helpers';
 import { logAudit } from './auditStore';
+import { useAlertsStore } from './alertsStore';
+import { useStaffStore } from './staffStore';
+import { ROLE_LABELS } from '../utils/permissions';
 
 // Internal helper used by audit log calls. Looks up patient name/MRN at the
 // time of the action so audit entries are self-contained.
@@ -169,6 +172,31 @@ export const usePatientStore = create<PatientStore>()(
           category: 'medication', action: 'prescribe',
           description: `Prescribed ${newMed.name} ${newMed.dosage} ${newMed.frequency} (${newMed.route}) for ${ctx.patientName}`,
           resourceType: 'medication', resourceId: newMed.id, ...ctx,
+        });
+
+        // Push a bell alert visible to anyone who needs to act on a new
+        // prescription: the pharmacist (to verify + dispense), other clinical
+        // prescribers (peer awareness), and admin (oversight). On a shared
+        // backend each of those users on other devices would see the alert
+        // immediately; in browser-local mode the alert is visible to whoever
+        // is currently signed in if their role matches the allow-list.
+        const prescriber = useStaffStore.getState().currentUser;
+        const prescriberRoleLabel = prescriber?.role ? ROLE_LABELS[prescriber.role] : 'Clinician';
+        const prescriberName = prescriber ? `${prescriber.firstName} ${prescriber.lastName}` : 'Unknown clinician';
+        useAlertsStore.getState().push({
+          category: 'medication',
+          severity: 'info',
+          source: 'manual',
+          title: `New prescription — ${newMed.name} ${newMed.dosage}`,
+          message: `${prescriberRoleLabel} ${prescriberName} prescribed ${newMed.name} ${newMed.dosage} ${newMed.frequency} (${newMed.route}) for ${ctx.patientName}. ${newMed.indication ? 'Indication: ' + newMed.indication + '. ' : ''}Pharmacist: verify before dispensing.`,
+          link: `/medications?patientId=${patientId}`,
+          patientId,
+          patientName: ctx.patientName,
+          resourceId: newMed.id,
+          // Visible to all clinical prescribers (so the prescriber sees their
+          // own action confirmed in the bell history) and to pharmacists and
+          // admins.
+          visibleToRoles: ['physician', 'np', 'pa', 'pharmacist', 'admin'],
         });
       },
 

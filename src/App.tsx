@@ -18,6 +18,7 @@ import MaternityPage from './pages/MaternityPage';
 import LoginPage from './pages/LoginPage';
 import AuditLogPage from './pages/AuditLogPage';
 import HelpPage from './pages/HelpPage';
+import NotificationsPage from './pages/NotificationsPage';
 import { useStaffStore } from './store/staffStore';
 import RequirePermission from './components/ui/RequirePermission';
 
@@ -58,6 +59,7 @@ export default function App() {
             <Route path="/settings" element={<RequirePermission permission="settings:view"><SettingsPage /></RequirePermission>} />
             <Route path="/audit" element={<RequirePermission permission="audit:view"><AuditLogPage /></RequirePermission>} />
             <Route path="/help" element={<HelpPage />} />
+            <Route path="/alerts" element={<NotificationsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Route>

@@ -29,6 +29,7 @@ export interface Alert {
   message: string;
   link?: string;       // route to navigate to when clicked
   patientId?: string;
+  patientName?: string;
   resourceId?: string;
   createdAt: string;
   read: boolean;

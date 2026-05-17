@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, Activity,
   Pill, FlaskConical, Scan, UserCog, BarChart3,
-  Settings, Menu, X, Stethoscope, ChevronRight, Package, Baby, LogOut, ShieldCheck, HelpCircle
+  Settings, Menu, X, Stethoscope, ChevronRight, Package, Baby, LogOut, ShieldCheck, HelpCircle, Bell
 } from 'lucide-react';
 import { useUIStore } from '../../store/uiStore';
 import { useStaffStore } from '../../store/staffStore';
@@ -25,6 +25,7 @@ const navItems: { to: string; icon: React.ComponentType<{ size?: number; classNa
   { to: '/staff', icon: UserCog, label: 'Staff', permission: 'staff:view' },
   { to: '/reports', icon: BarChart3, label: 'Reports', permission: 'reports:view' },
   { to: '/audit', icon: ShieldCheck, label: 'Audit Log', permission: 'audit:view' },
+  { to: '/alerts', icon: Bell, label: 'Notifications' },
   { to: '/settings', icon: Settings, label: 'Settings', permission: 'settings:view' },
   { to: '/help', icon: HelpCircle, label: 'Help' },
 ];

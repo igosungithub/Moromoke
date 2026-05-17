@@ -58,10 +58,14 @@ export default function NotificationBell() {
   const warnings = alerts.filter((a) => a.severity === 'warning');
   const info = alerts.filter((a) => a.severity === 'info');
 
+  // Clicking an alert in the dropdown navigates to the dedicated Notifications
+  // page. From there each alert has its own "Open source page" link that jumps
+  // to the related patient / drug / lab. This split avoids accidentally
+  // bouncing the user around when they just wanted to triage their inbox.
   function handleClick(a: Alert) {
     markRead(a.id);
-    if (a.link) navigate(a.link);
     setOpen(false);
+    navigate('/alerts');
   }
 
   return (
@@ -172,6 +176,16 @@ export default function NotificationBell() {
               })}
             </div>
           )}
+
+          {/* Footer — always-visible link to the full alerts page */}
+          <div className="border-t border-gray-100 p-2 bg-gray-50">
+            <button
+              onClick={() => { setOpen(false); navigate('/alerts'); }}
+              className="w-full text-center text-xs font-medium text-blue-600 hover:text-blue-800 py-1"
+            >
+              See all notifications →
+            </button>
+          </div>
         </div>
       )}
     </div>

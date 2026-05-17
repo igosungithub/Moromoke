@@ -20,6 +20,7 @@ const pageTitles: Record<string, string> = {
   '/reports': 'Reports & Analytics',
   '/audit': 'Audit Log',
   '/help': 'Help & Quick Start',
+  '/alerts': 'Notifications & Alerts',
   '/settings': 'Settings',
 };
 
