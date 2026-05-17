@@ -55,7 +55,13 @@ async function callClaude(apiKey: string, input: ClinicalAiInput): Promise<strin
     messages: [{ role: 'user', content: buildUserMessage(input) }],
   };
 
-  // Try Vite dev proxy first (works in dev server), fall back to direct call
+  // Endpoint order:
+  //   1. /api/anthropic/v1/messages — Vite dev proxy in development OR the
+  //      Cloudflare Pages Function (functions/api/anthropic/[[path]].ts) in
+  //      production. When the Function has ANTHROPIC_API_KEY set as a secret,
+  //      the browser never sees the real key.
+  //   2. https://api.anthropic.com/v1/messages — direct browser fallback for
+  //      static-only hosts. Requires the user to supply a key in Settings.
   const endpoints = ['/api/anthropic/v1/messages', 'https://api.anthropic.com/v1/messages'];
   let lastError: Error | null = null;
 
@@ -63,11 +69,15 @@ async function callClaude(apiKey: string, input: ClinicalAiInput): Promise<strin
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
       };
+      // Only set x-api-key when we actually have one. The Cloudflare Function
+      // injects the server-side key if this header is missing.
+      if (apiKey) headers['x-api-key'] = apiKey;
       if (endpoint.startsWith('https://')) {
         headers['anthropic-dangerous-direct-browser-access'] = 'true';
+        // Direct browser route REQUIRES the user to bring their own key.
+        if (!apiKey) continue;
       }
       const res = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(body) });
       if (!res.ok) {

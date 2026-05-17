@@ -255,8 +255,13 @@ export default function SettingsPage() {
           <div>
             <label className="label flex items-center gap-2">
               <Sparkles size={14} className="text-purple-600" />
-              Anthropic API Key (for AI Clinical Decision Support)
+              Anthropic API Key — optional override
             </label>
+            <p className="text-xs text-gray-500 mb-2">
+              Hosted deployments (e.g. on Cloudflare Pages) can set <code className="bg-gray-100 px-1 rounded">ANTHROPIC_API_KEY</code> as
+              a Pages secret — the AI assistant then works for every user with no key required here. Only enter a key below if you're
+              running a static-only host or want to override the shared key with your own personal one.
+            </p>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <input

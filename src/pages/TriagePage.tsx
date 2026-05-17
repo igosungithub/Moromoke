@@ -79,11 +79,11 @@ export default function TriagePage() {
 
   async function runAiAssistant() {
     if (!protocol) return;
+    // The browser-side key is optional: hosted deployments can configure
+    // ANTHROPIC_API_KEY as a Cloudflare Pages secret, in which case the Pages
+    // Function injects the key server-side. We let the call go through with
+    // an empty key and surface a precise error only if the request fails.
     const apiKey = localStorage.getItem('moromoke_anthropic_key') || '';
-    if (!apiKey) {
-      setAiError('No Anthropic API key configured. Add one in Settings → API Keys to enable AI suggestions.');
-      return;
-    }
     setAiLoading(true);
     setAiError(null);
     setAiResponse(null);
