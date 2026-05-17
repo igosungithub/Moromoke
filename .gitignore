@@ -13,8 +13,12 @@ dist-ssr
 *.local
 
 # Generated drug catalog downloads can be very large.
+# We commit only the 14MB top-level index.json so the hosted build can browse
+# the 42k drug catalog out of the box. The 286MB details/ partition files
+# stay local — the app falls back to live FDA API for any missing details.
 data/drug-catalogs/
-public/drug-catalogs/
+public/drug-catalogs/details/
+public/drug-catalogs/*.tmp.json
 
 # Editor directories and files
 .vscode/*

@@ -1,0 +1,23 @@
+# Cloudflare Pages headers for Moromoke EMR.
+# JS/CSS bundles are hashed by Vite, so they can be cached for a year.
+# The drug catalog is large but stable — cache aggressively and let SWR refresh.
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/drug-catalogs/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+# index.html must always be fetched fresh so users get new releases
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Security headers — sensible defaults for a browser-only EMR.
+# (Adjust if you add embedded iframes or external scripts.)
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
