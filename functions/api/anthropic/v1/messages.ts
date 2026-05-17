@@ -34,6 +34,11 @@ export async function onRequestOptions(ctx: CFContext): Promise<Response> {
   });
 }
 
+// Cap the upstream request body to keep a hostile visitor from burning
+// Anthropic credits with a giant prompt. 32 KB is plenty for our clinical
+// queries (typically 1–4 KB) and rejects anything obviously abusive.
+const MAX_BODY_BYTES = 32 * 1024;
+
 export async function onRequestPost(ctx: CFContext): Promise<Response> {
   const { request, env } = ctx;
 
@@ -47,6 +52,11 @@ export async function onRequestPost(ctx: CFContext): Promise<Response> {
   }
 
   const body = await request.text();
+  if (body.length > MAX_BODY_BYTES) {
+    return new Response(JSON.stringify({
+      error: `Request body exceeds ${MAX_BODY_BYTES} bytes. Clinical AI prompts should not be this large.`,
+    }), { status: 413, headers: { 'Content-Type': 'application/json' } });
+  }
 
   const upstreamHeaders = new Headers();
   upstreamHeaders.set('Content-Type', request.headers.get('Content-Type') ?? 'application/json');

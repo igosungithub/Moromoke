@@ -142,6 +142,63 @@ export default function HelpPage() {
           For production deployment, run behind your hospital's firewall, configure full-disk encryption, and ensure audit log retention follows your jurisdiction's requirements (typically 7–10 years).
         </p>
       </div>
+
+      {/* Hosted deployment guide — admin-only */}
+      {(role === 'admin' || roles.includes('admin')) && (
+        <div className="card bg-blue-50 border-blue-200">
+          <h2 className="font-semibold text-blue-900 mb-2 text-sm flex items-center gap-2">
+            <ShieldCheck size={14} className="text-blue-600" /> Cloudflare deployment hardening
+          </h2>
+          <div className="text-xs text-blue-800 space-y-3 leading-relaxed">
+            <div>
+              <p className="font-semibold mb-1">1. Set the Anthropic API key as a server secret (one-time)</p>
+              <p>
+                In the Cloudflare dashboard → your Pages project → <strong>Settings → Environment variables → Production →
+                Add variable</strong>. Name: <code className="bg-blue-100 px-1 rounded">ANTHROPIC_API_KEY</code>, value:
+                your <code className="bg-blue-100 px-1 rounded">sk-ant-...</code> key, <strong>tick "Encrypt"</strong>, save,
+                then click <strong>Retry deployment</strong>. After that the AI assistant works for every signed-in user
+                without anyone entering a key here.
+              </p>
+            </div>
+            <div>
+              <p className="font-semibold mb-1">2. Restrict access with Cloudflare Access (free for ≤50 users)</p>
+              <p>
+                In the Cloudflare dashboard top-right account menu → <strong>Zero Trust</strong> → <strong>Access →
+                Applications → Add an application → Self-hosted</strong>. Domain:
+                <code className="bg-blue-100 px-1 rounded">moromoke.pages.dev</code> (or your custom domain). Identity
+                providers: pick <strong>One-time PIN</strong>. Policy: <strong>Allow</strong> →
+                Selector: <strong>Emails</strong> → list each clinician's email, or <strong>Emails ending in</strong>
+                <code className="bg-blue-100 px-1 rounded">@your-hospital.org</code>. Session duration: 24h. Save.
+                After that, hitting the URL prompts for an email PIN before the EMR login screen even loads.
+              </p>
+            </div>
+            <div>
+              <p className="font-semibold mb-1">3. Offload the 286 MB drug-details bundle to R2 (optional)</p>
+              <p>
+                Create a public R2 bucket: dashboard → <strong>R2 → Create bucket</strong>
+                (e.g. <code className="bg-blue-100 px-1 rounded">moromoke-drug-details</code>) → Settings →
+                <strong>R2.dev public bucket: Enabled</strong>. Upload the local{' '}
+                <code className="bg-blue-100 px-1 rounded">public/drug-catalogs/index.json</code> and{' '}
+                <code className="bg-blue-100 px-1 rounded">public/drug-catalogs/details/</code> folder via the web UI
+                or <code className="bg-blue-100 px-1 rounded">wrangler r2 object put</code>. Then in your Pages project
+                → <strong>Settings → Environment variables → Production</strong> add{' '}
+                <code className="bg-blue-100 px-1 rounded">VITE_DRUG_DETAILS_BASE_URL</code> set to the bucket URL
+                (e.g. <code className="bg-blue-100 px-1 rounded">https://pub-xxx.r2.dev</code>). Redeploy.
+                R2 free tier: 10 GB storage + 1M class-A ops/month, plenty for this dataset.
+              </p>
+            </div>
+            <div>
+              <p className="font-semibold mb-1">4. Multi-clinician shared database — not configured</p>
+              <p>
+                Right now every clinician has their own copy of patients/audit/drug-stock in their browser. A real
+                shared backend (Cloudflare D1 + Workers + server-side auth) is a multi-day project; ask the
+                developer to scope it when you're ready. Until then, treat each browser as one workstation and don't
+                expect data to appear across devices.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

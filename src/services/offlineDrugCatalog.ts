@@ -53,9 +53,19 @@ let indexCache: OfflineCatalogIndex | null = null;
 let indexLoadPromise: Promise<OfflineCatalogIndex | null> | null = null;
 const partitionCache = new Map<number, OfflineCatalogDetail[]>();
 
-const INDEX_URL = '/drug-catalogs/index.json';
-const DETAIL_URL = (partition: number) =>
-  `/drug-catalogs/details/part-${String(partition).padStart(4, '0')}.json`;
+// Where to fetch the catalog index from. Defaults to the same origin as the
+// SPA (so /drug-catalogs/index.json on the deployed site). Override with the
+// VITE_DRUG_DETAILS_BASE_URL env var when you want to host the larger
+// details bundle on a separate origin — e.g. a Cloudflare R2 public bucket
+// like https://r2-moromoke.<account>.r2.dev or your custom domain.
+const DETAILS_BASE = (import.meta.env.VITE_DRUG_DETAILS_BASE_URL || '').replace(/\/$/, '');
+const INDEX_URL = DETAILS_BASE
+  ? `${DETAILS_BASE}/index.json`
+  : '/drug-catalogs/index.json';
+const DETAIL_URL = (partition: number) => {
+  const file = `details/part-${String(partition).padStart(4, '0')}.json`;
+  return DETAILS_BASE ? `${DETAILS_BASE}/${file}` : `/drug-catalogs/${file}`;
+};
 
 export function offlineCatalogAvailable(): boolean {
   return indexCache !== null;

@@ -3,6 +3,7 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import NotificationToast from '../ui/NotificationToast';
 import IdleTimeoutBanner from './IdleTimeoutBanner';
+import HostedNotice from './HostedNotice';
 
 const pageTitles: Record<string, string> = {
   '/': 'Dashboard',
@@ -39,6 +40,7 @@ export default function Layout() {
       </div>
       <NotificationToast />
       <IdleTimeoutBanner />
+      <HostedNotice />
     </div>
   );
 }
