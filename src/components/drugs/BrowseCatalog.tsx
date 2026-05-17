@@ -50,8 +50,9 @@ function entryToStockItem(e: OfflineCatalogEntry): Omit<DrugStockItem, 'id' | 'c
       sources: e.source.includes('openfda-ndc') ? ['fda_ndc'] : ['rxnorm'],
       rxcui: e.rxcui,
       ndcProductCode: e.ndc,
+      importedAt: new Date().toISOString(),
     },
-  } as Omit<DrugStockItem, 'id' | 'createdAt' | 'updatedAt'>;
+  };
 }
 
 // Best-effort route mapping — FDA labels often store free text like 'oral'

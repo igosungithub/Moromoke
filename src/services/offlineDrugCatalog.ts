@@ -132,13 +132,13 @@ export async function loadDetail(entry: OfflineCatalogEntry): Promise<OfflineCat
   // Multiple detail records may exist for the same key (NDC + label); merge them.
   const matches = bucket.filter((d) => d.key === entry.key);
   if (matches.length === 0) return null;
-  const merged: OfflineCatalogDetail = { ...matches[0] };
+  const mergedRecord: Record<string, unknown> = { ...(matches[0] as unknown as Record<string, unknown>) };
   for (const m of matches.slice(1)) {
-    for (const [k, v] of Object.entries(m)) {
-      if (v && !(merged as Record<string, unknown>)[k]) {
-        (merged as Record<string, unknown>)[k] = v;
+    for (const [k, v] of Object.entries(m as unknown as Record<string, unknown>)) {
+      if (v && !mergedRecord[k]) {
+        mergedRecord[k] = v;
       }
     }
   }
-  return merged;
+  return mergedRecord as unknown as OfflineCatalogDetail;
 }

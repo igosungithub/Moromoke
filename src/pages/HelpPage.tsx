@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import {
   HelpCircle, Stethoscope, Users, Activity, Pill, Package,
-  FlaskConical, Scan, Baby, ShieldCheck, Bell, Lock, Sparkles, ArrowRight
+  FlaskConical, Baby, ShieldCheck, Bell, Lock, Sparkles, ArrowRight
 } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
 import { ROLE_LABELS, ROLE_ACCESS_DESCRIPTIONS } from '../utils/permissions';

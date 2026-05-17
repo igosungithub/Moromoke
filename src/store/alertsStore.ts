@@ -54,7 +54,7 @@ const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;  // keep dismissed alerts 7 days
 
 export const useAlertsStore = create<AlertsStore>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       alerts: [],
 
       push: ({ id, source = 'manual', ...rest }) => {
